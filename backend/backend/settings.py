@@ -1,14 +1,14 @@
 import os
 from pathlib import Path
-from django.core.management.utils import get_random_secret_key
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
+SECRET_KEY = 'django-insecure-8qt#orqin=kkp)4$$7p0f08donr61n@leb+n!n9dp4lq-&^i3s'
 
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = True
 
-ALLOWED_HOSTS = ['158.160.75.171', '127.0.0.1', 'localhost', 'aderline.ru']
+ALLOWED_HOSTS = []
+
 
 
 INSTALLED_APPS = [
@@ -62,13 +62,15 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('POSTGRES_DB', 'foodgram_db'),
-        'USER': os.getenv('POSTGRES_USER', 'foodgram_user'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'foodgram_password'),
-        'HOST': os.getenv('DB_HOST', 'db'),
-        'PORT': os.getenv('DB_PORT', 5432)
+        'NAME': 'foodgram_db',  # Используйте правильное имя базы данных
+        'USER': 'foodgram_user',  # Используйте правильного пользователя
+        'PASSWORD': 'foodgram_password',  # Убедитесь, что это правильный пароль
+        'HOST': 'db',  # Хост контейнера базы данных
+        'PORT': '5432',  # Порт по умолчанию для PostgreSQL
     }
 }
+
+
 
 
 AUTH_PASSWORD_VALIDATORS = [
