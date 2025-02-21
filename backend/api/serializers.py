@@ -14,39 +14,7 @@ ERROR_MESSAGE = 'Не удается войти с предоставленны�
 
 
 class RecipeSerializer(serializers.ModelSerializer):
-    image = Base64ImageField(use_url=True)
-    tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True)
-    ingredients = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all(), many=True)
-
-    class Meta:
-        model = Recipe
-        fields = ('id', 'name', 'image', 'tags', 'ingredients', 'cooking_time')
-
-    def validate_ingredients(self, value):
-        if len(value) == 0:
-            raise serializers.ValidationError('Рецепт должен содержать хотя бы один ингредиент.')
-        return value
-
-    def validate_cooking_time(self, value):
-        if value <= 0:
-            raise serializers.ValidationError('Время приготовления должно быть положительным.')
-        return value
-
-
-
-class IngredientSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Ingredient
-        fields = '__all__'
-
-
-class TagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Tag
-        fields = ('id', 'name', 'color', 'slug')
-
-
-class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
+    """Сериализатор для рецептов."""
     image = Base64ImageField(use_url=True)
     tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True)
     ingredients = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all(), many=True)
@@ -68,66 +36,85 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         return value
 
 
-class AuthTokenSerializer(serializers.Serializer):
-    email = serializers.EmailField(write_only=True)
-    password = serializers.CharField(style={'input_type': 'password'}, write_only=True)
-    token = serializers.CharField(read_only=True)
 
-    def validate(self, data):
-        email = data.get('email')
-        password = data.get('password')
+class IngredientSerializer(serializers.ModelSerializer):
+    """Сериализатор для ингредиентов."""
+    class Meta:
+        model = Ingredient
+        fields = '__all__'
 
-        if not email or not password:
-            raise serializers.ValidationError('Email и пароль обязательны.')
-        
-        # Получаем пользователя с заданным email
-        user = User.objects.filter(email=email).first()
 
-        # Если пользователь не найден
-        if user is None:
-            raise serializers.ValidationError('Неверные учетные данные.')
+class TagSerializer(serializers.ModelSerializer):
+    """Сериализатор для тегов."""
+    class Meta:
+        model = Tag
+        fields = '__all__'
 
-        # Если пароль неверный
-        if not user.check_password(password):
-            raise serializers.ValidationError('Неверные учетные данные.')
 
-        # Если пользователь не активен
-        if not user.is_active:
-            raise serializers.ValidationError('Аккаунт не активирован.')
+class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
+    """Сериализатор для создания и обновления рецепта."""
+    image = Base64ImageField(use_url=True)
+    tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True)
+    ingredients = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all(), many=True)
 
-        data['user'] = user
-        return data
+    class Meta:
+        model = Recipe
+        fields = ('id', 'name', 'image', 'tags', 'ingredients', 'cooking_time')
+
+    def validate_ingredients(self, value):
+        """Проверка, что в рецепте есть хотя бы один ингредиент."""
+        if len(value) == 0:
+            raise serializers.ValidationError('Рецепт должен содержать хотя бы один ингредиент.')
+        return value
+
+    def validate_cooking_time(self, value):
+        """Проверка, что время приготовления положительное."""
+        if value <= 0:
+            raise serializers.ValidationError('Время приготовления должно быть положительным.')
+        return value
 
 
 class SubscriptionMixin:
+    """Миксин для получения статуса подписки пользователя."""
     def get_subscription_status(self, obj):
+        """Проверяет, подписан ли текущий пользователь на переданного пользователя."""
         user = self.context['request'].user
-        return user.is_authenticated and Subscription.objects.filter(user=user, author=obj).exists()
+        return user.is_authenticated and Subscription.objects.filter(user=user, subscribed_user=obj).exists()
 
 
 class UserProfileSerializer(SubscriptionMixin, serializers.ModelSerializer):
+    """Сериализатор для профиля пользователя."""
     is_subscribed = serializers.SerializerMethodField()
+    avatar = serializers.ImageField(use_url=True, required=False)
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'is_subscribed')
+        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'is_subscribed', 'avatar')
+
+    def get_is_subscribed(self, obj):
+        """Определяет, подписан ли текущий пользователь на этого пользователя."""
+        return self.get_subscription_status(obj)
 
 
 class UserChangePasswordSerializer(serializers.Serializer):
+    """Сериализатор для изменения пароля пользователя."""
     new_password = serializers.CharField()
     current_password = serializers.CharField()
 
     def validate_current_password(self, value):
+        """Проверка текущего пароля пользователя."""
         user = self.context['request'].user
         if not authenticate(username=user.email, password=value):
             raise serializers.ValidationError('Текущий пароль неверен.')
         return value
 
     def validate_new_password(self, value):
+        """Проверка нового пароля пользователя с использованием стандартных валидаторов."""
         validate_password(value)
         return value
 
     def save(self, validated_data):
+        """Сохраняет новый пароль пользователя в базе данных."""
         user = self.context['request'].user
         user.password = make_password(validated_data['new_password'])
         user.save()
@@ -136,33 +123,26 @@ class UserChangePasswordSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     """Сериализатор для отображения информации о пользователе."""
-    avatar = Base64ImageField(use_url=True, required=False)  # Добавлено поле для аватара
+    avatar = serializers.ImageField(use_url=True, required=False)
     is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'avatar', 'is_subscribed']  # Учитываем аватар
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'avatar', 'is_subscribed']
         read_only_fields = ['id']
     
     def get_is_subscribed(self, obj):
-
+        """Проверяет, подписан ли текущий пользователь на этого пользователя."""
         return obj.subscriptions.exists()
-
-    def to_representation(self, instance):
-        # Отладочный вывод для проверки данных
-        print(f"Serializing user: {instance.username}")  # Вывод имени пользователя для отладки
-        print(f"All users: {[user.username for user in User.objects.all()]}")  # Вывод всех пользователей
-        
-        return super().to_representation(instance)
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания нового пользователя."""
-    #avatar = Base64ImageField(use_url=True, required=False)  # Добавлено поле для аватара
+    avatar = serializers.ImageField(use_url=True, required=False)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'password']  # Учитываем аватар
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'password']
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -183,42 +163,46 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для обновления информации о пользователе."""
-    avatar = Base64ImageField(use_url=True, required=False)  # Добавлено поле для аватара
+    avatar = Base64ImageField(use_url=True, required=False)
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'avatar']  # Учитываем аватар
+        fields = ['first_name', 'last_name', 'email', 'avatar']
         extra_kwargs = {
             'email': {'required': True}
         }
 
 
 class SetPasswordSerializer(serializers.Serializer):
-    """
-    Сериализатор для изменения пароля пользователя.
-    """
-    old_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True)
+    """Сериализатор для изменения пароля пользователя."""
+    current_password = serializers.CharField(write_only=True, required=True)
+    new_password = serializers.CharField(write_only=True, required=True)
 
     def validate(self, data):
-        # Логика валидации пароля
-        old_password = data.get('old_password')
+        """Проверка, что новый пароль не совпадает с текущим."""
+        current_password = data.get('current_password')
         new_password = data.get('new_password')
 
-        if old_password == new_password:
+        if current_password == new_password:
             raise serializers.ValidationError("Новый пароль не может быть таким же, как старый.")
 
         return data
 
     def set_password(self, user):
-        """
-        Метод для изменения пароля пользователя.
-        """
+        """Изменение пароля пользователя."""
         user.set_password(self.validated_data['new_password'])
         user.save()
 
+    def save(self, user=None):
+        """Сохранение нового пароля пользователя."""
+        if user is not None:
+            self.set_password(user)
+        else:
+            raise ValueError("User must be provided to save the password.")
+
 
 class SubscriptionSerializer(serializers.ModelSerializer):
+    """Сериализатор для отображения подписок."""
     author_email = serializers.EmailField(source='author.email')
     author_username = serializers.CharField(source='author.username')
 
@@ -227,5 +211,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         fields = ('author_email', 'author_username', 'is_subscribed')
 
     def get_is_subscribed(self, obj):
+        """Проверяет, подписан ли текущий пользователь на автора."""
         user = self.context['request'].user
         return Subscription.objects.filter(user=user, author=obj.author).exists()

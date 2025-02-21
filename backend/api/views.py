@@ -12,7 +12,7 @@ from .pagination import PaginatorWithLimit
 from .serializers import (
     UserSerializer, UserUpdateSerializer, UserProfileSerializer,
     RecipeSerializer, RecipeCreateUpdateSerializer, 
-    SubscriptionSerializer
+    SubscriptionSerializer, SetPasswordSerializer
 )
 from .serializers import UserCreateSerializer
 from .filters import RecipeFilter
@@ -59,16 +59,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
         recipe = get_object_or_404(Recipe, id=pk)
 
         if request.method == 'POST':
-            # Добавление в избранное
             favorite, created = Favorite.objects.get_or_create(user=user, recipe=recipe)
             if created:
-                return Response({"detail": "Recipe added to favorites"}, status=status.HTTP_201_CREATED)
-            return Response({"detail": "Recipe already in favorites"}, status=status.HTTP_200_OK)
+                return Response({'detail': 'Рецепт добавлен в избранное'}, status=status.HTTP_201_CREATED)
+            return Response({'detail': 'Рецепт уже в избранном'}, status=status.HTTP_200_OK)
 
-        # Удаление из избранного
         favorite = get_object_or_404(Favorite, user=user, recipe=recipe)
         favorite.delete()
-        return Response({"detail": "Recipe removed from favorites"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({'detail': 'Рецепт удалён из избранного'}, status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def shopping_cart(self, request, pk=None):
@@ -77,16 +75,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
         recipe = get_object_or_404(Recipe, id=pk)
 
         if request.method == 'POST':
-            # Добавление в корзину
             shopping_cart, created = ShoppingCart.objects.get_or_create(user=user, recipe=recipe)
             if created:
-                return Response({"detail": "Recipe added to shopping cart"}, status=status.HTTP_201_CREATED)
-            return Response({"detail": "Recipe already in shopping cart"}, status=status.HTTP_200_OK)
+                return Response({'detail': 'Рецепт добавлен в корзину'}, status=status.HTTP_201_CREATED)
+            return Response({'detail': 'Рецепт уже в корзине'}, status=status.HTTP_200_OK)
 
-        # Удаление из корзины
         shopping_cart = get_object_or_404(ShoppingCart, user=user, recipe=recipe)
         shopping_cart.delete()
-        return Response({"detail": "Recipe removed from shopping cart"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({'detail': 'Рецепт удалён из корзины'}, status=status.HTTP_204_NO_CONTENT)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -97,27 +93,27 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         """Выбор сериализатора в зависимости от метода запроса."""
-        if self.action == "me":
+        if self.action == 'me':
             return UserProfileSerializer
-        if self.request.method == "GET":
+        if self.request.method == 'GET':
             return UserSerializer
-        if self.request.method == "POST":
+        if self.request.method == 'POST':
             return UserCreateSerializer
         return UserUpdateSerializer
 
     def get_permissions(self):
         """Назначение прав доступа в зависимости от экшена."""
-        print(f"Проверка токена: {self.request.auth}")
-        if self.action in ("me", "subscriptions", "subscribe"):
+        if self.action in ('me', 'subscriptions', 'subscribe'):
             return [IsAuthenticated()]
-        if self.action in ("list", "retrieve"):
+        if self.action in ('list', 'retrieve'):
             return [AllowAny()]
         return super().get_permissions()
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
         """Получение данных текущего пользователя."""
-        print(f"Запрос от пользователя: {request.user}")
+        if not request.user.is_authenticated:
+            raise PermissionDenied('Для доступа к этим данным необходима аутентификация.')
         serializer = UserProfileSerializer(request.user, context={'request': request})
         return Response(serializer.data)
 
@@ -136,13 +132,44 @@ class UserViewSet(viewsets.ModelViewSet):
 
         if request.method == 'POST':
             serializer = SubscriptionSerializer(
-                data={'author': author.id}, context={"request": request}
+                data={'author': author.id}, context={'request': request}
             )
             serializer.is_valid(raise_exception=True)
             Subscription.objects.create(user=request.user, author=author)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         get_object_or_404(Subscription, user=request.user, author=author).delete()
-        return Response({'detail': 'Отписка прошла успешно'}, status=status.HTTP_204_NO_CONTENT)
+        return Response({'detail': 'Вы успешно отписались'}, status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=False, methods=['put'], permission_classes=[IsAuthenticated])
+    def avatar(self, request):
+        """Обновление аватара текущего пользователя."""
+        user = request.user
 
+        avatar = request.FILES.get('avatar')
 
+        if avatar:
+            if not avatar.content_type.startswith('image/'):
+                return Response({'detail': 'Файл должен быть изображением.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user.avatar = avatar
+            user.save()
+
+            return Response({'detail': 'Аватар успешно обновлён'}, status=status.HTTP_200_OK)
+
+        return Response({'detail': 'Аватар не был загружен.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def set_password(self, request):
+        """Изменение пароля текущего пользователя."""
+        user = request.user
+
+        serializer = SetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if not user.check_password(serializer.validated_data['current_password']):
+            raise ValidationError({'current_password': 'Неверный старый пароль.'})
+
+        serializer.save(user)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
