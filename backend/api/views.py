@@ -1,24 +1,45 @@
-from rest_framework import status, permissions, viewsets
+from rest_framework import status, permissions, viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from django.http import HttpResponse
+import django_filters
 
-from recipes.models import Favorite, ShoppingCart, Recipe
+from recipes.models import Favorite, ShoppingCart, Recipe, RecipeIngredient, Ingredient
 from users.models import User
 from .pagination import PaginatorWithLimit
 from .serializers import (
     UserSerializer, UserUpdateSerializer, UserProfileSerializer,
     RecipeSerializer, RecipeCreateUpdateSerializer, 
-    SubscriptionSerializer, SetPasswordSerializer
+    SubscriptionSerializer, SetPasswordSerializer, IngredientSerializer
 )
 from .serializers import UserCreateSerializer
-from .filters import RecipeFilter
+from .filters import RecipeFilter, IngredientSearchFilter
 from .permissions import IsAuthorOrAdminOrReadOnly
 
 User = get_user_model()
+
+
+class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet для ингредиентов с фильтрацией и поиском."""
+    queryset = Ingredient.objects.all()
+    serializer_class = IngredientSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_class = IngredientSearchFilter
+    search_fields = ['^name']
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticatedOrReadOnly])
+    def search(self, request):
+        """Поиск ингредиентов по части названия."""
+        query = request.query_params.get('query', '')
+        if query:
+            ingredients = Ingredient.objects.filter(name__icontains=query)
+            serializer = self.get_serializer(ingredients, many=True)
+            return Response(serializer.data)
+        return Response([], status=status.HTTP_400_BAD_REQUEST)
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
@@ -28,6 +49,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     filterset_class = RecipeFilter
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsAuthorOrAdminOrReadOnly]
     pagination_class = PaginatorWithLimit
+    ingredients = IngredientSerializer(many=True)  
 
     def get_serializer_class(self):
         """Выбираем сериализатор в зависимости от действия."""
@@ -45,12 +67,22 @@ class RecipeViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if self.request.query_params.get('is_favorited') == '1' and user.is_authenticated:
-            queryset = queryset.filter(favorite__user=user)
+            queryset = queryset.filter(favorited_by__id=user.id)
 
         if self.request.query_params.get('is_in_shopping_cart') == '1' and user.is_authenticated:
-            queryset = queryset.filter(shoppingcart__user=user)
+            queryset = queryset.filter(in_shopping_cart__user=user)
 
         return queryset
+
+    def add_ingredients(self, recipe, ingredients_data):
+        """Добавление ингредиентов в рецепт."""
+        for ingredient_data in ingredients_data:
+            ingredient = Ingredient.objects.get(id=ingredient_data['id'])
+            RecipeIngredient.objects.create(
+                recipe=recipe,
+                ingredient=ingredient,
+                amount=ingredient_data['amount']
+            )
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):
@@ -84,6 +116,35 @@ class RecipeViewSet(viewsets.ModelViewSet):
         shopping_cart.delete()
         return Response({'detail': 'Рецепт удалён из корзины'}, status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def download_shopping_cart(self, request):
+        """Скачать список покупок."""
+        user = request.user
+        shopping_cart = ShoppingCart.objects.filter(user=user).select_related('recipe')
+
+        if not shopping_cart.exists():
+            return Response({'detail': 'Корзина пуста'}, status=status.HTTP_400_BAD_REQUEST)
+
+        shopping_list = {}
+        for item in shopping_cart:
+            for ingredient in item.recipe.ingredients.all():
+                name = ingredient.name
+                amount = ingredient.amount
+                measurement_unit = ingredient.measurement_unit
+                if name in shopping_list:
+                    shopping_list[name]['amount'] += amount
+                else:
+                    shopping_list[name] = {'amount': amount, 'measurement_unit': measurement_unit}
+
+        shopping_text = "Список покупок:\n"
+        for name, data in shopping_list.items():
+            shopping_text += f"{name}: {data['amount']} {data['measurement_unit']}\n"
+
+        response = HttpResponse(shopping_text, content_type='text/plain')
+        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
+        return response
+
+
 
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet для управления пользователями."""
@@ -108,7 +169,7 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ('list', 'retrieve'):
             return [AllowAny()]
         return super().get_permissions()
-    
+        
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register(self, request):
         """Регистрация нового пользователя."""
@@ -129,7 +190,7 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def subscriptions(self, request):
         """Получение списка подписок текущего пользователя."""
-        queryset = User.objects.filter(subscribing__user=request.user)
+        queryset = Subscription.objects.filter(user=request.user)  # Исправлено
         page = self.paginate_queryset(queryset)
         serializer = SubscriptionSerializer(page, many=True, context={'request': request})
         return self.get_paginated_response(serializer.data)
@@ -137,19 +198,21 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def subscribe(self, request, pk=None):
         """Подписка и отписка от автора."""
+        print(f"PK received: {pk}")
         author = get_object_or_404(User, id=pk)
 
         if request.method == 'POST':
-            serializer = SubscriptionSerializer(
-                data={'author': author.id}, context={'request': request}
-            )
-            serializer.is_valid(raise_exception=True)
-            Subscription.objects.create(user=request.user, author=author)
+            if Subscription.objects.filter(user=request.user, subscribed_user=author).exists():
+                return Response({'detail': 'Вы уже подписаны'}, status=status.HTTP_400_BAD_REQUEST)
+
+            subscription = Subscription.objects.create(user=request.user, subscribed_user=author)  # Исправлено
+            serializer = SubscriptionSerializer(subscription, context={'request': request})  # Исправлено
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        get_object_or_404(Subscription, user=request.user, author=author).delete()
+        get_object_or_404(Subscription, user=request.user, subscribed_user=author).delete()
         return Response({'detail': 'Вы успешно отписались'}, status=status.HTTP_204_NO_CONTENT)
-    
+
+
     @action(detail=False, methods=['put'], permission_classes=[IsAuthenticated])
     def avatar(self, request):
         """Обновление аватара текущего пользователя."""

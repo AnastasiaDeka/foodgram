@@ -7,13 +7,23 @@ from tags.models import Tag
 
 class Ingredient(models.Model):
     """Модель ингредиента."""
+    
+    MEASUREMENT_UNITS = [
+        ('шт', 'Штуки'),
+        ('г', 'Граммы'),
+        ('мл', 'Миллилитры'),
+    ]
+    
     name = models.CharField(
         max_length=200,
         unique=True,
-        verbose_name="Название"
+        verbose_name="Название ингредиента"
     )
-    unit = models.CharField(
+    
+    measurement_unit = models.CharField(
         max_length=50,
+        choices=MEASUREMENT_UNITS,
+        default='шт',
         verbose_name="Единица измерения"
     )
 
@@ -23,7 +33,8 @@ class Ingredient(models.Model):
         verbose_name_plural = "Ингредиенты"
 
     def __str__(self):
-        return f"{self.name} ({self.unit})"
+        return f"{self.name} ({self.measurement_unit})"
+
 
 
 class Recipe(models.Model):
@@ -103,7 +114,7 @@ class RecipeIngredient(models.Model):
         verbose_name_plural = "Ингредиенты в рецептах"
 
     def __str__(self):
-        return f"{self.amount} {self.ingredient.unit} {self.ingredient.name}"
+        return f"{self.amount} {self.ingredient.measurement_unit} {self.ingredient.name}"
 
 
 class Favorite(models.Model):

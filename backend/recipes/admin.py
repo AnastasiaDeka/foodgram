@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import Recipe, Ingredient, Subscription, RecipeIngredient, Favorite, ShoppingCart
-from tags.admin import TagAdmin  # Импортируем TagAdmin из tags/admin.py
+from tags.admin import TagAdmin
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
@@ -11,7 +11,7 @@ class RecipeAdmin(admin.ModelAdmin):
 
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
-    list_display = ('name', 'unit')
+    list_display = ('pk', 'name', 'measurement_unit')
     search_fields = ('name',)
 
 

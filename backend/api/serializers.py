@@ -1,5 +1,5 @@
 from drf_base64.fields import Base64ImageField
-from recipes.models import Ingredient, Recipe, Subscription
+from recipes.models import Ingredient, Recipe, Subscription, RecipeIngredient
 from tags.models import Tag
 from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
@@ -13,11 +13,18 @@ User = get_user_model()
 ERROR_MESSAGE = 'Не удается войти с предоставленными учетными данными.'
 
 
+class IngredientSerializer(serializers.ModelSerializer):
+    """Сериализатор для ингредиентов."""
+    class Meta:
+        model = Ingredient
+        fields = ['id', 'name', 'measurement_unit'] 
+
+
 class RecipeSerializer(serializers.ModelSerializer):
     """Сериализатор для рецептов."""
     image = Base64ImageField(use_url=True)
     tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True)
-    ingredients = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all(), many=True)
+    ingredients = IngredientSerializer(many=True)
 
     class Meta:
         model = Recipe
@@ -34,14 +41,6 @@ class RecipeSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError('Время приготовления должно быть положительным.')
         return value
-
-
-
-class IngredientSerializer(serializers.ModelSerializer):
-    """Сериализатор для ингредиентов."""
-    class Meta:
-        model = Ingredient
-        fields = '__all__'
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -51,11 +50,20 @@ class TagSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class IngredientWithAmountSerializer(serializers.ModelSerializer):
+    """Сериализатор для ингредиентов с указанием количества в рецепте."""
+    amount = serializers.IntegerField(min_value=1, required=True)
+
+    class Meta:
+        model = Ingredient
+        fields = ['id', 'name', 'amount']
+
+
 class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания и обновления рецепта."""
     image = Base64ImageField(use_url=True)
     tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True)
-    ingredients = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all(), many=True)
+    ingredients = IngredientWithAmountSerializer(many=True)
 
     class Meta:
         model = Recipe
@@ -72,6 +80,25 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError('Время приготовления должно быть положительным.')
         return value
+
+    def create(self, validated_data):
+        ingredients_data = validated_data.pop('ingredients')
+        tags = validated_data.pop('tags')
+        recipe = Recipe.objects.create(**validated_data)
+        recipe.tags.set(tags)
+        
+        for ingredient_data in ingredients_data:
+            ingredient, created = Ingredient.objects.get_or_create(name=ingredient_data['name'])
+            
+            amount = ingredient_data['amount']
+            
+            RecipeIngredient.objects.create(
+                recipe=recipe,
+                ingredient=ingredient,
+                amount=amount
+            )
+
+        return recipe
 
 
 class SubscriptionMixin:
@@ -203,14 +230,18 @@ class SetPasswordSerializer(serializers.Serializer):
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     """Сериализатор для отображения подписок."""
-    author_email = serializers.EmailField(source='author.email')
-    author_username = serializers.CharField(source='author.username')
+    id = serializers.IntegerField(source='subscribed_user.id')
+    author_email = serializers.EmailField(source='subscribed_user.email')
+    author_username = serializers.CharField(source='subscribed_user.username')
+    is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
-        fields = ('author_email', 'author_username', 'is_subscribed')
+        fields = ('id', 'author_email', 'author_username', 'is_subscribed')
 
     def get_is_subscribed(self, obj):
         """Проверяет, подписан ли текущий пользователь на автора."""
         user = self.context['request'].user
-        return Subscription.objects.filter(user=user, author=obj.author).exists()
+        if user.is_anonymous:
+            return False
+        return Subscription.objects.filter(user=user, subscribed_user=obj.subscribed_user).exists()

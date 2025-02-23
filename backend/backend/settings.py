@@ -7,8 +7,13 @@ SECRET_KEY = 'django-insecure-8qt#orqin=kkp)4$$7p0f08donr61n@leb+n!n9dp4lq-&^i3s
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
 
+#CSRF_TRUSTED_ORIGINS = [
+#    'http://localhost',
+#    'http://127.0.0.1',
+#    'http://158.160.75.171',  # Добавляем серверный IP
+#]
 
 
 INSTALLED_APPS = [
@@ -62,11 +67,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'foodgram_db',  # Используйте правильное имя базы данных
-        'USER': 'foodgram_user',  # Используйте правильного пользователя
-        'PASSWORD': 'foodgram_password',  # Убедитесь, что это правильный пароль
-        'HOST': 'db',  # Хост контейнера базы данных
-        'PORT': '5432',  # Порт по умолчанию для PostgreSQL
+        'NAME': 'foodgram_db',
+        'USER': 'foodgram_user',
+        'PASSWORD': 'foodgram_password',
+        'HOST': 'db',
+        #'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
@@ -111,7 +117,7 @@ AUTH_USER_MODEL = 'users.User'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        #'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',

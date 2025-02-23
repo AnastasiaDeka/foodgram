@@ -20,8 +20,8 @@ class IsAuthorOrAdminOrReadOnly(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
-            return True  # Разрешаем чтение всем (GET, HEAD, OPTIONS)
-        return request.user.is_staff or obj.author == request.user  # Только автор или админ
+            return True
+        return request.user.is_staff or obj.author == request.user
 
 class IsAdminOrReadOnly(BasePermission):
     """
@@ -31,5 +31,5 @@ class IsAdminOrReadOnly(BasePermission):
 
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
-            return True  # Чтение доступно всем
-        return request.user.is_staff  # Только админы могут изменять
+            return True
+        return request.user.is_staff

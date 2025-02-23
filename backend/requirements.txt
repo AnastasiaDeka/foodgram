@@ -23,4 +23,4 @@ social-auth-core==4.5.6
 sqlparse==0.5.3
 urllib3==2.3.0
 gunicorn
-
+drf-extra-fields
