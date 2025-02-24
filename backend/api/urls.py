@@ -11,15 +11,11 @@ router.register(r'users', UserViewSet, basename='user')
 router.register(r'tags', TagViewSet, basename='tag')
 
 urlpatterns = [
-    # Маршруты для авторизации через Djoser
-    path('auth/', include('djoser.urls')),
-    path('auth/', include('djoser.urls.authtoken')),
-    
-    
-
-  # Обработает регистрацию, восстановление пароля и прочее
-    
-
-    # Основные маршруты приложения
+    # Ваши обычные маршруты
     path('', include(router.urls)),
+
+    # Кастомный маршрут для подписки/отписки
+    path('auth/', include('djoser.urls')),
+    path('auth/token/', include('djoser.urls.authtoken')), 
+    path('users/me/', UserViewSet.as_view({'get': 'me'}), name='user-me'),
 ]

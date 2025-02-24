@@ -7,8 +7,8 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
 import django_filters
-
-from recipes.models import Favorite, ShoppingCart, Recipe, RecipeIngredient, Ingredient
+from rest_framework.exceptions import NotFound
+from recipes.models import Favorite, ShoppingCart, Recipe, RecipeIngredient, Ingredient, Subscription
 from users.models import User
 from .pagination import PaginatorWithLimit
 from .serializers import (
@@ -29,6 +29,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = IngredientSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_class = IngredientSearchFilter
+    pagination_class = None
     search_fields = ['^name']
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticatedOrReadOnly])
@@ -145,11 +146,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return response
 
 
-
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet для управления пользователями."""
-    queryset = User.objects.all().order_by('email')
-    pagination_class = PaginatorWithLimit
+    #queryset = User.objects.all().order_by('email')
+    queryset = User.objects.all()
+    #pagination_class = PaginatorWithLimit
     permission_classes = (AllowAny,)
 
     def get_serializer_class(self):
@@ -161,6 +162,17 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.request.method == 'POST':
             return UserCreateSerializer
         return UserUpdateSerializer
+    
+    def retrieve(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')     
+        if pk == 'undefined':
+            return Response({'detail': 'Некорректный ID пользователя'}, status=status.HTTP_400_BAD_REQUEST)
+        if pk == str(request.user.id):
+            user = request.user
+        else:
+            user = self.get_object()
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
 
     def get_permissions(self):
         """Назначение прав доступа в зависимости от экшена."""
@@ -182,31 +194,31 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
         """Получение данных текущего пользователя."""
-        if not request.user.is_authenticated:
-            raise PermissionDenied('Для доступа к этим данным необходима аутентификация.')
         serializer = UserProfileSerializer(request.user, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def subscriptions(self, request):
         """Получение списка подписок текущего пользователя."""
-        queryset = Subscription.objects.filter(user=request.user)  # Исправлено
+        queryset = Subscription.objects.filter(user=request.user)
+
         page = self.paginate_queryset(queryset)
         serializer = SubscriptionSerializer(page, many=True, context={'request': request})
         return self.get_paginated_response(serializer.data)
 
+
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
     def subscribe(self, request, pk=None):
         """Подписка и отписка от автора."""
-        print(f"PK received: {pk}")
+
         author = get_object_or_404(User, id=pk)
 
         if request.method == 'POST':
             if Subscription.objects.filter(user=request.user, subscribed_user=author).exists():
                 return Response({'detail': 'Вы уже подписаны'}, status=status.HTTP_400_BAD_REQUEST)
 
-            subscription = Subscription.objects.create(user=request.user, subscribed_user=author)  # Исправлено
-            serializer = SubscriptionSerializer(subscription, context={'request': request})  # Исправлено
+            subscription = Subscription.objects.create(user=request.user, subscribed_user=author)
+            serializer = SubscriptionSerializer(subscription, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         get_object_or_404(Subscription, user=request.user, subscribed_user=author).delete()
@@ -228,7 +240,6 @@ class UserViewSet(viewsets.ModelViewSet):
             user.save()
 
             return Response({'detail': 'Аватар успешно обновлён'}, status=status.HTTP_200_OK)
-
         return Response({'detail': 'Аватар не был загружен.'}, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])

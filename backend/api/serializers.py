@@ -8,7 +8,6 @@ from django.contrib.auth.hashers import make_password
 from tags.models import Tag
 from recipes.models import Ingredient, Recipe, Subscription
 from django.core.exceptions import ValidationError
-
 User = get_user_model()
 ERROR_MESSAGE = 'Не удается войти с предоставленными учетными данными.'
 
@@ -22,6 +21,8 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 class RecipeSerializer(serializers.ModelSerializer):
     """Сериализатор для рецептов."""
+
+    id = serializers.IntegerField(read_only=True)
     image = Base64ImageField(use_url=True)
     tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True)
     ingredients = IngredientSerializer(many=True)
@@ -52,12 +53,14 @@ class TagSerializer(serializers.ModelSerializer):
 
 class IngredientWithAmountSerializer(serializers.ModelSerializer):
     """Сериализатор для ингредиентов с указанием количества в рецепте."""
-    amount = serializers.IntegerField(min_value=1, required=True)
+    id = serializers.IntegerField()
+    name = serializers.CharField(source='ingredient.name', read_only=True)
+    amount = serializers.IntegerField()
 
     class Meta:
-        model = Ingredient
+        model = RecipeIngredient
         fields = ['id', 'name', 'amount']
-
+    
 
 class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания и обновления рецепта."""
@@ -86,12 +89,12 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         tags = validated_data.pop('tags')
         recipe = Recipe.objects.create(**validated_data)
         recipe.tags.set(tags)
-        
+
         for ingredient_data in ingredients_data:
-            ingredient, created = Ingredient.objects.get_or_create(name=ingredient_data['name'])
-            
+            ingredient = Ingredient.objects.get(id=ingredient_data['id'])
+
             amount = ingredient_data['amount']
-            
+
             RecipeIngredient.objects.create(
                 recipe=recipe,
                 ingredient=ingredient,
@@ -150,8 +153,10 @@ class UserChangePasswordSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     """Сериализатор для отображения информации о пользователе."""
+    id = serializers.IntegerField(read_only=True)
     avatar = serializers.ImageField(use_url=True, required=False)
     is_subscribed = serializers.SerializerMethodField()
+    
 
     class Meta:
         model = User
