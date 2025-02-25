@@ -58,7 +58,7 @@ class UserReadSerializer(serializers.ModelSerializer):
     def get_is_subscribed(self, obj):
         request = self.context.get('request')
         return (request and request.user.is_authenticated
-                and request.user.subscriptions.filter(author=obj).exists())
+                and request.user.subscriptions.filter(subscribed_user=obj).exists())
 
 
 class RecipeSerializer(serializers.ModelSerializer):
@@ -66,7 +66,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     author = UserReadSerializer(read_only=True)
     image = Base64ImageField(use_url=True)
     tags = TagSerializer(many=True, read_only=True)
-    ingredients = IngredientAmountSerializer(many=True, source='recipeingredient_set')
+    ingredients = IngredientAmountSerializer(many=True, source='recipe_ingredients')
 
     class Meta:
         model = Recipe
@@ -140,7 +140,7 @@ class RecipeListSerializer(serializers.ModelSerializer):
             Shopping_cart.objects.filter(user=request.user, recipe=obj).exists()
         )
 
-        
+
 class SubscriptionMixin:
     """Миксин для получения статуса подписки пользователя."""
     def get_subscription_status(self, obj):
