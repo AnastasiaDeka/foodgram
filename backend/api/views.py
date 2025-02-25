@@ -1,6 +1,7 @@
 from rest_framework import status, permissions, viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from collections import defaultdict
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
@@ -15,11 +16,14 @@ from .serializers import (
     UserSerializer, UserUpdateSerializer, UserProfileSerializer,
     RecipeSerializer, RecipeCreateUpdateSerializer, 
     SubscriptionSerializer, SetPasswordSerializer, IngredientSerializer, 
-    AvatarUpdateSerializer, IngredientAmountSerializer
+    AvatarUpdateSerializer, IngredientAmountSerializer, ShoppingCartSerializer
 )
 from .serializers import UserCreateSerializer
 from .filters import RecipeFilter, IngredientSearchFilter
 from .permissions import IsAuthorOrAdminOrReadOnly
+
+
+
 
 User = get_user_model()
 
@@ -145,7 +149,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsAuthorOrAdminOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrAdminOrReadOnly]
     pagination_class = PaginatorWithLimit
 
     def get_serializer_class(self):
@@ -196,17 +200,27 @@ class RecipeViewSet(viewsets.ModelViewSet):
         favorite = get_object_or_404(Favorite, user=user, recipe=recipe)
         favorite.delete()
         return Response({'detail': 'Рецепт удалён из избранного'}, status=status.HTTP_204_NO_CONTENT)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def shopping_cart_list(self, request):
+        """Возвращает список всех рецептов в корзине пользователя."""
+        shopping_cart = ShoppingCart.objects.filter(user=request.user)
+        serializer = ShoppingCartSerializer(shopping_cart, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
-    def shopping_cart(self, request, id=None):
+    def shopping_cart(self, request, pk=None):
         """Добавить/удалить рецепт в/из корзины."""
         user = request.user
-        recipe = get_object_or_404(Recipe, id=id)
+        recipe = get_object_or_404(Recipe, pk=pk)
 
         if request.method == 'POST':
             shopping_cart, created = ShoppingCart.objects.get_or_create(user=user, recipe=recipe)
             if created:
-                return Response({'detail': 'Рецепт добавлен в корзину'}, status=status.HTTP_201_CREATED)
+                # Сериализация добавленного объекта корзины
+                serializer = ShoppingCartSerializer(shopping_cart)
+                return Response({'detail': 'Рецепт добавлен в корзину', 'shopping_cart': serializer.data}, 
+                                status=status.HTTP_201_CREATED)
             return Response({'detail': 'Рецепт уже в корзине'}, status=status.HTTP_200_OK)
 
         shopping_cart = get_object_or_404(ShoppingCart, user=user, recipe=recipe)
@@ -214,29 +228,29 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response({'detail': 'Рецепт удалён из корзины'}, status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
-    def download_shopping_cart(self, request):
-        """Скачать список покупок."""
+    def download_shopping_cart(self, request, *args, **kwargs):
+        """Получить все ингредиенты из корзины покупок с суммированием."""
         user = request.user
-        shopping_cart = ShoppingCart.objects.filter(user=user).select_related('recipe')
+        shopping_cart_items = ShoppingCart.objects.filter(user=user)
 
-        if not shopping_cart.exists():
-            return Response({'detail': 'Корзина пуста'}, status=status.HTTP_400_BAD_REQUEST)
-
-        shopping_list = {}
-        for item in shopping_cart:
-            for ingredient in item.recipe.ingredients.all():
-                name = ingredient.name
-                amount = ingredient.amount
-                measurement_unit = ingredient.measurement_unit
-                if name in shopping_list:
-                    shopping_list[name]['amount'] += amount
+        shopping_cart_data = {}
+        for item in shopping_cart_items:
+            recipe = item.recipe
+            for recipe_ingredient in recipe.recipe_ingredients.all():
+                ingredient = recipe_ingredient.ingredient
+                amount = recipe_ingredient.amount
+                # Суммирование ингредиентов
+                if ingredient.name in shopping_cart_data:
+                    shopping_cart_data[ingredient.name]['amount'] += amount
                 else:
-                    shopping_list[name] = {'amount': amount, 'measurement_unit': measurement_unit}
+                    shopping_cart_data[ingredient.name] = {
+                        'ingredient': ingredient.name,
+                        'amount': amount,
+                        'measurement_unit': ingredient.measurement_unit,
+                    }
 
-        shopping_text = "Список покупок:\n"
-        for name, data in shopping_list.items():
-            shopping_text += f"{name}: {data['amount']} {data['measurement_unit']}\n"
+        # Формирование ответа
+        shopping_cart_data_list = list(shopping_cart_data.values())
 
-        response = HttpResponse(shopping_text, content_type='text/plain')
-        response['Content-Disposition'] = 'attachment; filename="shopping_list.txt"'
-        return response
+        # Дополнительная логика для формирования ответа (например, создание PDF или CSV)
+        return Response({'shopping_cart': shopping_cart_data_list})

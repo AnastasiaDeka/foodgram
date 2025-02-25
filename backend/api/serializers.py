@@ -1,13 +1,13 @@
 from drf_base64.fields import Base64ImageField
-from recipes.models import Ingredient, Recipe, Subscription, RecipeIngredient
+from recipes.models import Ingredient, Recipe, Subscription, RecipeIngredient, ShoppingCart
 from tags.models import Tag
 from rest_framework import serializers
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.hashers import make_password
 from tags.models import Tag
-from recipes.models import Ingredient, Recipe, Subscription
 from django.core.exceptions import ValidationError
+
 User = get_user_model()
 ERROR_MESSAGE = 'Не удается войти с предоставленными учетными данными.'
 
@@ -27,17 +27,23 @@ class IngredientSerializer(serializers.ModelSerializer):
 
 
 class IngredientAmountSerializer(serializers.ModelSerializer):
-    """Сериализатор для ингредиентов с указанием количества в рецепте."""
-    id = serializers.IntegerField()
-    name = serializers.CharField(source='ingredient.name', read_only=True)
-    measurement_unit = serializers.CharField(
-        source='ingredient.measurement_unit', read_only=True
-    )
+    """Сериализатор для ингредиентов с количеством в рецепте."""
+    id = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all())
     amount = serializers.IntegerField()
 
     class Meta:
         model = RecipeIngredient
-        fields = ['id', 'name', 'measurement_unit', 'amount']
+        fields = ['id', 'amount']
+
+    def to_representation(self, instance):
+        """Форматируем ответ с полной информацией об ингредиенте."""
+        return {
+            'id': instance.ingredient.id,
+            'name': instance.ingredient.name,
+            'measurement_unit': instance.ingredient.measurement_unit,
+            'amount': instance.amount
+        }
+
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -84,33 +90,31 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         model = Recipe
         fields = ('id', 'name', 'image', 'tags', 'ingredients', 'cooking_time', 'author')
 
-    def validate_ingredients(self, value):
-        """Проверка, что в рецепте есть хотя бы один ингредиент."""
-        if not value:
-            raise serializers.ValidationError('Рецепт должен содержать хотя бы один ингредиент.')
-        return value
-
-    def validate_cooking_time(self, value):
-        """Проверка, что время приготовления положительное."""
-        if value <= 0:
-            raise serializers.ValidationError('Время приготовления должно быть положительным.')
-        return value
-
     def create(self, validated_data):
         ingredients_data = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
         user = self.context['request'].user
 
+        # Удаляем author из validated_data, так как мы присваиваем его вручную
+        validated_data.pop('author', None)
+
+        # Создаем рецепт
         recipe = Recipe.objects.create(author=user, **validated_data)
         recipe.tags.set(tags)
 
+        # Обрабатываем ингредиенты
         recipe_ingredients = [
-            RecipeIngredient(recipe=recipe, ingredient=Ingredient.objects.get(id=item['id']), amount=item['amount'])
+            RecipeIngredient(
+                recipe=recipe,
+                ingredient=item['id'],
+                amount=item['amount']
+            )
             for item in ingredients_data
         ]
         RecipeIngredient.objects.bulk_create(recipe_ingredients)
 
         return recipe
+
 
 
 class RecipeListSerializer(serializers.ModelSerializer):
@@ -137,9 +141,51 @@ class RecipeListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return (
             request.user.is_authenticated and
-            Shopping_cart.objects.filter(user=request.user, recipe=obj).exists()
+            ShoppingCart.objects.filter(user=request.user, recipe=obj).exists()
         )
 
+
+class ShoppingCartSerializer(serializers.ModelSerializer):
+    """Сериализатор для корзины покупок."""
+    recipe = RecipeSerializer()  # Сериализатор для рецепта
+    ingredients = serializers.SerializerMethodField()  # Список ингредиентов
+
+    class Meta:
+        model = ShoppingCart
+        fields = ['recipe', 'ingredients']
+
+    def get_ingredients(self, obj):
+        """Возвращает список ингредиентов для рецепта в корзине."""
+        return [
+            {
+                'ingredient': recipe_ingredient.ingredient.name,
+                'amount': recipe_ingredient.amount,
+                'measurement_unit': recipe_ingredient.ingredient.measurement_unit,
+            }
+            for recipe_ingredient in obj.recipe.recipe_ingredients.all()
+        ]
+
+class ShoppingCartSerializer(serializers.ModelSerializer):
+    recipe = serializers.PrimaryKeyRelatedField(queryset=Recipe.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+
+    class Meta:
+        model = ShoppingCart
+        fields = (
+            'id',
+            'recipe',
+            'user'
+        )
+
+    def validate(self, data):
+        user = data['user']
+        recipe_id = data['recipe'].id
+        if ShoppingCart.objects.filter(
+            user=user,
+            recipe__id=recipe_id
+        ).exists():
+            raise ValidationError(SHOPLIST_ADDED)
+        return data
 
 class SubscriptionMixin:
     """Миксин для получения статуса подписки пользователя."""
@@ -160,7 +206,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         """Возвращает URL аватара пользователя, если он есть."""
         request = self.context.get('request')
         if obj.avatar and request:
-            # Используем request.build_absolute_uri для получения полного URL
             return request.build_absolute_uri(obj.avatar.url)
         return None
 
@@ -312,6 +357,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         """Возвращает URL аватара пользователя, если он есть."""
         request = self.context.get('request')
         if obj.avatar and request:
-            # Используем request.build_absolute_uri для получения полного URL
+
             return request.build_absolute_uri(obj.avatar.url)
         return None
