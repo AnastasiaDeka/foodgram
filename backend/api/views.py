@@ -15,7 +15,7 @@ from .serializers import (
     UserSerializer, UserUpdateSerializer, UserProfileSerializer,
     RecipeSerializer, RecipeCreateUpdateSerializer, 
     SubscriptionSerializer, SetPasswordSerializer, IngredientSerializer, 
-    AvatarUpdateSerializer
+    AvatarUpdateSerializer, IngredientAmountSerializer
 )
 from .serializers import UserCreateSerializer
 from .filters import RecipeFilter, IngredientSearchFilter
@@ -71,10 +71,10 @@ class UserViewSet(viewsets.ModelViewSet):
         return self.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
-    def subscribe(self, request, id=None):
+    def subscribe(self, request, pk=None):
         """Подписка и отписка от автора."""
 
-        author = get_object_or_404(User, id=id)
+        author = get_object_or_404(User, id=pk)
 
         if request.method == 'POST':
             if Subscription.objects.filter(user=request.user, subscribed_user=author).exists():
@@ -87,33 +87,37 @@ class UserViewSet(viewsets.ModelViewSet):
         get_object_or_404(Subscription, user=request.user, subscribed_user=author).delete()
         return Response({'detail': 'Вы успешно отписались'}, status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=False, methods=['put'], permission_classes=[IsAuthenticated])
-    def avatar(self, request):
-        """Обновление аватара текущего пользователя."""
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    def favorite(self, request, pk=None):
+        """Добавить/удалить рецепт в/из избранного."""
         user = request.user
-        serializer_class = AvatarUpdateSerializer
-        serializer = serializer_class(user, data=request.data, partial=True)
+        recipe = get_object_or_404(Recipe, id=pk)
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'detail': 'Аватар успешно обновлён'}, status=status.HTTP_200_OK)
-    
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if request.method == 'POST':
+            favorite, created = Favorite.objects.get_or_create(user=user, recipe=recipe)
+            if created:
+                return Response({'detail': 'Рецепт добавлен в избранное'}, status=status.HTTP_201_CREATED)
+            return Response({'detail': 'Рецепт уже в избранном'}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
-    def set_password(self, request):
-        """Изменение пароля текущего пользователя."""
+        favorite = get_object_or_404(Favorite, user=user, recipe=recipe)
+        favorite.delete()
+        return Response({'detail': 'Рецепт удалён из избранного'}, status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[IsAuthenticated])
+    def shopping_cart(self, request, pk=None):
+        """Добавить/удалить рецепт в/из корзины."""
         user = request.user
+        recipe = get_object_or_404(Recipe, id=pk)
 
-        serializer = SetPasswordSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if request.method == 'POST':
+            shopping_cart, created = ShoppingCart.objects.get_or_create(user=user, recipe=recipe)
+            if created:
+                return Response({'detail': 'Рецепт добавлен в корзину'}, status=status.HTTP_201_CREATED)
+            return Response({'detail': 'Рецепт уже в корзине'}, status=status.HTTP_200_OK)
 
-        if not user.check_password(serializer.validated_data['current_password']):
-            raise ValidationError({'current_password': 'Неверный старый пароль.'})
-
-        serializer.save(user)
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        shopping_cart = get_object_or_404(ShoppingCart, user=user, recipe=recipe)
+        shopping_cart.delete()
+        return Response({'detail': 'Рецепт удалён из корзины'}, status=status.HTTP_204_NO_CONTENT)
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
@@ -143,7 +147,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
     filterset_class = RecipeFilter
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsAuthorOrAdminOrReadOnly]
     pagination_class = PaginatorWithLimit
-    ingredients = IngredientSerializer(many=True)  
 
     def get_serializer_class(self):
         """Выбираем сериализатор в зависимости от действия."""
