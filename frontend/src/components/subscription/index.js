@@ -29,7 +29,7 @@ const Subscription = ({
 }) => {
   const shouldShowButton = recipes_count > 3;
   const moreRecipes = recipes_count - 3;
-  const [toDelete, setToDelete] = useState(false);
+  const [toDelete, setToDelete] = useState(false);  
 
   return (
     <div className={styles.subscription}>

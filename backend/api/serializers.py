@@ -112,18 +112,20 @@ class SubscriptionMixin:
         return user.is_authenticated and Subscription.objects.filter(user=user, subscribed_user=obj).exists()
 
 
-class UserProfileSerializer(SubscriptionMixin, serializers.ModelSerializer):
-    """Сериализатор для профиля пользователя."""
-    is_subscribed = serializers.SerializerMethodField()
-    avatar = serializers.ImageField(use_url=True, required=False)
+class UserProfileSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'first_name', 'last_name', 'is_subscribed', 'avatar')
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'avatar']
 
-    def get_is_subscribed(self, obj):
-        """Определяет, подписан ли текущий пользователь на этого пользователя."""
-        return self.get_subscription_status(obj)
+    def get_avatar(self, obj):
+        """Возвращает URL аватара пользователя, если он есть."""
+        request = self.context.get('request')
+        if obj.avatar and request:
+            # Используем request.build_absolute_uri для получения полного URL
+            return request.build_absolute_uri(obj.avatar.url)
+        return None
 
 
 class UserChangePasswordSerializer(serializers.Serializer):
@@ -153,8 +155,6 @@ class UserChangePasswordSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     """Сериализатор для отображения информации о пользователе."""
-    id = serializers.IntegerField(read_only=True)
-    avatar = serializers.ImageField(use_url=True, required=False)
     is_subscribed = serializers.SerializerMethodField()
     
 
@@ -164,8 +164,11 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
     
     def get_is_subscribed(self, obj):
-        """Проверяет, подписан ли текущий пользователь на этого пользователя."""
-        return obj.subscriptions.exists()
+        user = self.context['request'].user
+        if user.is_anonymous:
+            return False
+        return Subscription.objects.filter(user=user, subscribed_user=obj).exists()
+
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -195,7 +198,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для обновления информации о пользователе."""
-    avatar = Base64ImageField(use_url=True, required=False)
+    avatar = serializers.ImageField(required=True)
 
     class Meta:
         model = User
@@ -250,3 +253,28 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         if user.is_anonymous:
             return False
         return Subscription.objects.filter(user=user, subscribed_user=obj.subscribed_user).exists()
+
+
+class AvatarUpdateSerializer(serializers.ModelSerializer):
+    """Сериализатор для обновления аватара пользователя."""
+    avatar = serializers.ImageField(required=True)
+
+    class Meta:
+        model = User
+        fields = ['avatar']
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    avatar = serializers.ImageField(required=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'avatar']
+
+    def get_avatar(self, obj):
+        """Возвращает URL аватара пользователя, если он есть."""
+        request = self.context.get('request')
+        if obj.avatar and request:
+            # Используем request.build_absolute_uri для получения полного URL
+            return request.build_absolute_uri(obj.avatar.url)
+        return None
