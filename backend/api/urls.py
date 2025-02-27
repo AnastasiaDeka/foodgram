@@ -1,6 +1,11 @@
+"""Маршруты для API проекта Foodgram.
+
+Этот модуль определяет маршруты для работы с рецептами, пользователями,
+ингредиентами и тегами. Также подключены маршруты Djoser для аутентификации.
+"""
+
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from djoser import views as djoser_views
 from .views import (
     RecipeViewSet,
     UserViewSet,

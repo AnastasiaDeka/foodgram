@@ -1,14 +1,29 @@
+"""Модуль фильтров для рецептов."""
+
 import django_filters
 from recipes.models import Recipe
 
+
 class RecipeFilter(django_filters.FilterSet):
     """Фильтр для рецептов."""
-    tags = django_filters.CharFilter(field_name='tags__slug', method='filter_tags')
-    author = django_filters.NumberFilter(field_name='author__id')
-    is_favorited = django_filters.BooleanFilter(method='filter_is_favorited')
-    is_in_shopping_cart = django_filters.BooleanFilter(method='filter_is_in_shopping_cart')
+
+    tags = django_filters.CharFilter(
+        field_name='tags__slug',
+        method='filter_tags'
+    )
+    author = django_filters.NumberFilter(
+        field_name='author__id'
+    )
+    is_favorited = django_filters.BooleanFilter(
+        method='filter_is_favorited'
+    )
+    is_in_shopping_cart = django_filters.BooleanFilter(
+        method='filter_is_in_shopping_cart'
+    )
 
     class Meta:
+        """Мета-класс для фильтрации рецептов."""
+
         model = Recipe
         fields = ['tags', 'author']
 

@@ -1,5 +1,7 @@
 """Модели для тегов."""
+
 from django.db import models
+
 
 class Tag(models.Model):
     """Модель для тегов."""
@@ -8,4 +10,5 @@ class Tag(models.Model):
     slug = models.SlugField(unique=True)
 
     def __str__(self):
+        """Возвращает строковое представление тега."""
         return self.name

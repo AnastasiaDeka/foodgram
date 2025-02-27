@@ -12,7 +12,6 @@ from .models import (
     ShoppingCart,
 )
 from users.models import User
-from tags.admin import TagAdmin
 
 
 @admin.register(User)
@@ -47,23 +46,31 @@ class IngredientAdmin(admin.ModelAdmin):
 
 @admin.register(RecipeIngredient)
 class RecipeIngredientAdmin(admin.ModelAdmin):
+    """Админ-панель для ингредиентов в рецепте."""
+
     list_display = ("recipe", "ingredient", "amount")
     search_fields = ("recipe__name", "ingredient__name")
 
 
 @admin.register(Favorite)
 class FavoriteAdmin(admin.ModelAdmin):
+    """Админ-панель для избранных рецептов."""
+
     list_display = ("user", "recipe", "created_at")
     search_fields = ("user__username", "recipe__name")
 
 
 @admin.register(ShoppingCart)
 class ShoppingCartAdmin(admin.ModelAdmin):
+    """Админ-панель для корзины покупок."""
+
     list_display = ("user", "recipe")
     search_fields = ("user__username", "recipe__name")
 
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
+    """Админ-панель для подписок."""
+
     list_display = ("user", "subscribed_user", "created_at")
     search_fields = ("user__username", "subscribed_user__username")
