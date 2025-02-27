@@ -370,25 +370,49 @@ class SetPasswordSerializer(serializers.Serializer):
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
-    """Сериализатор для отображения подписок."""
+    """Сериализатор для подписок."""
 
     id = serializers.IntegerField(source="subscribed_user.id")
-    author_email = serializers.EmailField(source="subscribed_user.email")
-    author_username = serializers.CharField(source="subscribed_user.username")
+    email = serializers.EmailField(source="subscribed_user.email")
+    username = serializers.CharField(source="subscribed_user.username")
+    first_name = serializers.CharField(source="subscribed_user.first_name")
+    last_name = serializers.CharField(source="subscribed_user.last_name")
     is_subscribed = serializers.SerializerMethodField()
+    recipes = serializers.SerializerMethodField()
+    recipes_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
-        fields = ("id", "author_email", "author_username", "is_subscribed")
+        fields = (
+            "id",
+            "email",
+            "username",
+            "first_name",
+            "last_name",
+            "is_subscribed",
+            "recipes",
+            "recipes_count",
+        )
 
     def get_is_subscribed(self, obj):
         """Проверяет, подписан ли текущий пользователь на автора."""
         user = self.context["request"].user
-        if user.is_anonymous:
-            return False
-        return Subscription.objects.filter(
-            user=user, subscribed_user=obj.subscribed_user
-        ).exists()
+        return (
+            user.is_authenticated
+            and Subscription.objects.filter(
+                user=user, subscribed_user=obj.subscribed_user
+            ).exists()
+        )
+
+    def get_recipes(self, obj):
+        """Получение рецептов автора с учетом лимита."""
+        recipes_limit = self.context.get("recipes_limit")
+        recipes = obj.subscribed_user.recipes.all()[:recipes_limit]
+        return RecipeSerializer(recipes, many=True, context=self.context).data
+
+    def get_recipes_count(self, obj):
+        """Получение количества рецептов автора."""
+        return obj.subscribed_user.recipes.count()
 
 
 class AvatarUpdateSerializer(serializers.ModelSerializer):
