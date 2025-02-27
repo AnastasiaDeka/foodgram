@@ -244,32 +244,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
 
-class UserChangePasswordSerializer(serializers.Serializer):
-    """Сериализатор для изменения пароля пользователя."""
-
-    new_password = serializers.CharField()
-    current_password = serializers.CharField()
-
-    def validate_current_password(self, value):
-        """Проверка текущего пароля пользователя."""
-        user = self.context["request"].user
-        if not authenticate(username=user.email, password=value):
-            raise serializers.ValidationError("Текущий пароль неверен.")
-        return value
-
-    def validate_new_password(self, value):
-        """Проверка нового пароля пользователя с использованием стандартных валидаторов."""
-        validate_password(value)
-        return value
-
-    def save(self, validated_data):
-        """Сохраняет новый пароль пользователя в базе данных."""
-        user = self.context["request"].user
-        user.password = make_password(validated_data["new_password"])
-        user.save()
-        return user
-
-
 class UserSerializer(serializers.ModelSerializer):
     """Сериализатор для отображения информации о пользователе."""
 
