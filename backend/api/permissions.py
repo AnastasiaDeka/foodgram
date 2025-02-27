@@ -8,8 +8,8 @@ class IsAuthorOrReadOnly(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
-            return True  # Разрешаем GET, HEAD, OPTIONS всем пользователям
-        return obj.author == request.user  # Изменять и удалять может только автор
+            return True
+        return obj.author == request.user
 
 
 class IsAuthorOrAdminOrReadOnly(BasePermission):

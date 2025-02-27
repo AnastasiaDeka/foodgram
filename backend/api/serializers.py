@@ -62,7 +62,15 @@ class UserReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("email", "id", "username", "first_name", "last_name", "is_subscribed")
+        fields = (
+            "email",
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "is_subscribed",
+            "avatar",
+        )
 
     def get_is_subscribed(self, obj):
         """Проверяет, подписан ли текущий пользователь."""
@@ -181,17 +189,14 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         tags = validated_data.pop("tags", None)
         ingredients = validated_data.pop("ingredients", None)
 
-        # Обновляем базовые поля
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        # Обновляем теги
         if tags is not None:
             instance.tags.clear()
             instance.tags.set(tags)
 
-        # Обновляем ингредиенты
         if ingredients is not None:
             instance.recipe_ingredients.all().delete()
             self._create_ingredients(instance, ingredients)
@@ -351,6 +356,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="subscribed_user.username")
     first_name = serializers.CharField(source="subscribed_user.first_name")
     last_name = serializers.CharField(source="subscribed_user.last_name")
+    avatar = serializers.ImageField(source="subscribed_user.avatar")
     is_subscribed = serializers.SerializerMethodField()
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
@@ -366,6 +372,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             "is_subscribed",
             "recipes",
             "recipes_count",
+            "avatar",
         )
 
     def get_is_subscribed(self, obj):
@@ -403,13 +410,11 @@ class AvatarUpdateSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("Необходимо загрузить изображение.")
 
-        # Проверка размера файла (например, максимум 2MB)
         if value.size > 50 * 1024 * 1024:
             raise serializers.ValidationError(
                 "Размер изображения не должен превышать 50MB."
             )
 
-        # Проверка формата файла
         allowed_formats = ["image/jpeg", "image/jpg", "image/png"]
         if hasattr(value, "content_type") and value.content_type not in allowed_formats:
             raise serializers.ValidationError(
@@ -421,7 +426,6 @@ class AvatarUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         """Обновление аватара пользователя."""
         if "avatar" in validated_data:
-            # Удаляем старый аватар, если он существует
             if instance.avatar:
                 instance.avatar.delete(save=False)
 

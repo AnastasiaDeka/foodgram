@@ -157,23 +157,19 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def subscriptions(self, request):
         """Получение списка подписок текущего пользователя."""
-        # Получаем параметры из запроса
         recipes_limit = int(request.query_params.get("recipes_limit", 3))
 
-        # Получаем подписки пользователя
         queryset = (
             Subscription.objects.filter(user=request.user)
             .select_related("subscribed_user")
             .prefetch_related(
                 "subscribed_user__recipes"
-            )  # Оптимизируем запросы для рецептов
+            )
             .order_by("-id")
         )
 
-        # Пагинация
         page = self.paginate_queryset(queryset)
 
-        # Сериализация с передачей лимита рецептов
         serializer = SubscriptionSerializer(
             page,
             many=True,
