@@ -43,7 +43,7 @@ from .serializers import (
     IngredientAmountSerializer,
     TagSerializer,
     UserCreateSerializer,
-    IngredientSerializer,
+    IngredientSerializer,    
 )
 from .filters import RecipeFilter, IngredientSearchFilter
 from .permissions import IsAuthorOrAdminOrReadOnly
@@ -212,24 +212,17 @@ class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrAdminOrReadOnly]
     pagination_class = PaginatorWithLimit
     serializer_class = RecipeSerializer
-
-    def get_serializer_class(self):
-        """Выбор сериализатора в зависимости от действия."""
-        if self.action in ["create", "update", "partial_update"]:
-            return RecipeCreateUpdateSerializer
-        return RecipeSerializer
+    
 
     def get_queryset(self):
         """Получение отфильтрованного списка рецептов."""
-        queryset = super().get_queryset()
+        queryset = Recipe.objects.all()
         user = self.request.user
 
-        if (
-            self.request.query_params.get("is_favorited") == "1"
-            and user.is_authenticated
-        ):
-            queryset = queryset.filter(favorited_by__id=user.id)
-
+        if user.is_authenticated:
+            if self.request.query_params.get("is_favorited") == "1":
+                return queryset.filter(favorited_by__user=user)
+        
         if (
             self.request.query_params.get("is_in_shopping_cart") == "1"
             and user.is_authenticated
@@ -237,6 +230,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(in_shopping_cart__user=user)
 
         return queryset
+
+    def get_serializer_class(self):
+        """Выбор сериализатора в зависимости от действия."""
+        if self.action in ["create", "update", "partial_update"]:
+            return RecipeCreateUpdateSerializer
+        return RecipeSerializer
 
     def perform_create(self, serializer):
         """Сохранение рецепта с указанием автора."""
@@ -324,8 +323,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            Favorite.objects.create(user=user, recipe=recipe)
-            serializer = RecipeSerializer(recipe, context={"request": request})
+            favorite = Favorite.objects.create(user=user, recipe=recipe)
+            serializer = FavoriteSerializer(favorite)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         favorite = get_object_or_404(Favorite, user=user, recipe=recipe)

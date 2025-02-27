@@ -8,6 +8,7 @@ from recipes.models import (
     Subscription,
     RecipeIngredient,
     ShoppingCart,
+    Favorite,
 )
 from tags.models import Tag
 from rest_framework import serializers
@@ -117,11 +118,11 @@ class RecipeSerializer(serializers.ModelSerializer):
         ]
 
     def get_is_favorited(self, obj):
-        """Проверяет, находится ли рецепт в избранном."""
+        """Проверяет, добавлен ли рецепт в избранное."""
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return False
-        return obj.favorited_by.filter(user=request.user).exists()
+        return Favorite.objects.filter(user=request.user, recipe=obj).exists()
 
     def get_is_in_shopping_cart(self, obj):
         """Проверяет, находится ли рецепт в корзине."""
