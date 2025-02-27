@@ -20,6 +20,7 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
+from django.urls import reverse
 
 from recipes.models import (
     Recipe,
@@ -43,7 +44,7 @@ from .serializers import (
     IngredientAmountSerializer,
     TagSerializer,
     UserCreateSerializer,
-    IngredientSerializer,    
+    IngredientSerializer,
 )
 from .filters import RecipeFilter, IngredientSearchFilter
 from .permissions import IsAuthorOrAdminOrReadOnly
@@ -212,24 +213,28 @@ class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly, IsAuthorOrAdminOrReadOnly]
     pagination_class = PaginatorWithLimit
     serializer_class = RecipeSerializer
-    
 
     def get_queryset(self):
         """Получение отфильтрованного списка рецептов."""
         queryset = Recipe.objects.all()
         user = self.request.user
+        author_id = self.request.query_params.get("author")
+
+        if author_id:
+            # Фильтруем рецепты по автору
+            queryset = queryset.filter(author_id=author_id)
 
         if user.is_authenticated:
             if self.request.query_params.get("is_favorited") == "1":
-                return queryset.filter(favorited_by__user=user)
-        
+                queryset = queryset.filter(favorited_by__user=user)
+
         if (
             self.request.query_params.get("is_in_shopping_cart") == "1"
             and user.is_authenticated
         ):
             queryset = queryset.filter(in_shopping_cart__user=user)
 
-        return queryset
+        return queryset.order_by("-id")  # Сортируем по убыванию id
 
     def get_serializer_class(self):
         """Выбор сериализатора в зависимости от действия."""
@@ -330,3 +335,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
         favorite = get_object_or_404(Favorite, user=user, recipe=recipe)
         favorite.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True, methods=["get"], permission_classes=[AllowAny], url_path="get-link"
+    )
+    def get_link(self, request, pk=None):
+        """Получение прямой короткой ссылки на рецепт."""
+        recipe = get_object_or_404(Recipe, id=pk)
+
+        return Response({"short-link": f"{request.get_host()}/recipes/{recipe.pk}/"})

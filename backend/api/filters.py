@@ -2,15 +2,20 @@ import django_filters
 from django_filters.rest_framework import FilterSet
 from recipes.models import Recipe, Ingredient
 
+
 class RecipeFilter(FilterSet):
     """Фильтр для рецептов с дополнительной оптимизацией."""
-    is_favorited = django_filters.BooleanFilter(method='filter_is_favorited')
-    is_in_shopping_cart = django_filters.BooleanFilter(method='filter_is_in_shopping_cart')
-    tags = django_filters.AllValuesMultipleFilter(field_name='tags__slug')
+
+    author = django_filters.NumberFilter(field_name="author__id")
+    is_favorited = django_filters.BooleanFilter(method="filter_is_favorited")
+    is_in_shopping_cart = django_filters.BooleanFilter(
+        method="filter_is_in_shopping_cart"
+    )
+    tags = django_filters.AllValuesMultipleFilter(field_name="tags__slug")
 
     class Meta:
         model = Recipe
-        fields = ['tags', 'is_favorited', 'is_in_shopping_cart']
+        fields = ["author", "tags", "is_favorited", "is_in_shopping_cart"]
 
     def filter_is_favorited(self, queryset, name, value):
         """Фильтрация избранных рецептов для авторизованных пользователей."""
@@ -29,9 +34,9 @@ class RecipeFilter(FilterSet):
 
 class IngredientSearchFilter(django_filters.FilterSet):
     """Фильтр для ингредиентов по названию."""
-    name = django_filters.CharFilter(field_name='name', lookup_expr='istartswith')
+
+    name = django_filters.CharFilter(field_name="name", lookup_expr="istartswith")
 
     class Meta:
         model = Ingredient
-        fields = ['name']
-
+        fields = ["name"]
