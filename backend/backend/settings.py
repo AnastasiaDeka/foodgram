@@ -1,20 +1,14 @@
 import os
 from pathlib import Path
+from django.core.management.utils import get_random_secret_key
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-8qt#orqin=kkp)4$$7p0f08donr61n@leb+n!n9dp4lq-&^i3s'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
 
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
-
-#CSRF_TRUSTED_ORIGINS = [
-#    'http://localhost',
-#    'http://127.0.0.1',
-#    'http://158.160.75.171',  # Добавляем серверный IP
-#]
-
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
