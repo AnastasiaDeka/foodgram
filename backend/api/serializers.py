@@ -1,6 +1,9 @@
 """Сериализаторы для API."""
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from drf_base64.fields import Base64ImageField
+from rest_framework import serializers
 from recipes.models import (
     Ingredient,
     Recipe,
@@ -10,9 +13,6 @@ from recipes.models import (
     Favorite,
 )
 from tags.models import Tag
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from django.contrib.auth.password_validation import validate_password
 
 User = get_user_model()
 ERROR_MESSAGE = 'Не удается войти с предоставленными учетными данными.'
