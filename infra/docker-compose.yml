@@ -40,6 +40,7 @@ services:
       - "8000:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
       - foodgram_static:/var/html/static/
       - foodgram_media:/var/html/media/
       - ../frontend/build:/usr/share/nginx/html/
