@@ -1,6 +1,7 @@
 """Административная часть для тегов."""
 
 from django.contrib import admin
+
 from .models import Tag
 
 

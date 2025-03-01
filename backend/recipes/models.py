@@ -1,10 +1,10 @@
 """Модели для приложения рецептов."""
 
-from django.db import models
 from django.core.validators import MinValueValidator
+from django.db import models
 from django.utils import timezone
-from users.models import User
 from tags.models import Tag
+from users.models import User
 
 
 class Ingredient(models.Model):

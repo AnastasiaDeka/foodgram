@@ -1,8 +1,9 @@
 """Модуль представлений для работы с тегами."""
 
-from rest_framework import viewsets
-from .models import Tag
 from api.serializers import TagSerializer
+from rest_framework import viewsets
+
+from .models import Tag
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):

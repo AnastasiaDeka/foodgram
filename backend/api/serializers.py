@@ -3,15 +3,9 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from drf_base64.fields import Base64ImageField
+from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
+                            ShoppingCart, Subscription)
 from rest_framework import serializers
-from recipes.models import (
-    Ingredient,
-    Recipe,
-    Subscription,
-    RecipeIngredient,
-    ShoppingCart,
-    Favorite,
-)
 from tags.models import Tag
 
 User = get_user_model()

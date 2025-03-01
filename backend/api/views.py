@@ -1,47 +1,30 @@
 """ViewSet модули для API."""
 
-from datetime import datetime
 import os
+from datetime import datetime
 
 from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
+                            ShoppingCart, Subscription)
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import (
-    AllowAny,
-    IsAuthenticated,
-    IsAuthenticatedOrReadOnly,
-)
+from rest_framework.permissions import (AllowAny, IsAuthenticated,
+                                        IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
-
-from recipes.models import (
-    Favorite,
-    Ingredient,
-    Recipe,
-    RecipeIngredient,
-    ShoppingCart,
-    Subscription,
-)
 from users.models import User
 
 from .filters import IngredientSearchFilter, RecipeFilter
 from .pagination import PaginatorWithLimit
 from .permissions import IsAuthorOrAdminOrReadOnly
-from .serializers import (
-    AvatarUpdateSerializer,
-    IngredientSerializer,
-    RecipeCreateUpdateSerializer,
-    RecipeSerializer,
-    SetPasswordSerializer,
-    SubscriptionSerializer,
-    UserCreateSerializer,
-    UserProfileSerializer,
-    UserSerializer,
-    UserUpdateSerializer,
-)
+from .serializers import (AvatarUpdateSerializer, IngredientSerializer,
+                          RecipeCreateUpdateSerializer, RecipeSerializer,
+                          SetPasswordSerializer, SubscriptionSerializer,
+                          UserCreateSerializer, UserProfileSerializer,
+                          UserSerializer, UserUpdateSerializer)
 
 
 class UserViewSet(viewsets.ModelViewSet):
