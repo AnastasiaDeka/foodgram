@@ -14,7 +14,6 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
 CSRF_TRUSTED_ORIGINS = [
     'https://aderline.ru',
     'https://158.160.75.171'
-    'http://aderline.ru',
 ]
 
 INSTALLED_APPS = [
