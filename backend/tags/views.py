@@ -12,4 +12,3 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tag.objects.all().order_by('id')
     serializer_class = TagSerializer
     pagination_class = None
-
