@@ -15,6 +15,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
+from rest_framework.authentication import TokenAuthentication
 from users.models import User
 
 from .filters import IngredientSearchFilter, RecipeFilter
@@ -33,6 +34,7 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     parser_classes = (MultiPartParser, FormParser, JSONParser)
+    authentication_classes = [TokenAuthentication]
 
     def get_serializer_class(self):
         """Выбор сериализатора в зависимости от метода запроса."""

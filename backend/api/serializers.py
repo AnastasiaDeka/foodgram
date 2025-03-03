@@ -299,11 +299,8 @@ class UserSerializer(serializers.ModelSerializer):
 class UserCreateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания нового пользователя."""
 
-    avatar = serializers.ImageField(use_url=True, required=False)
-
     class Meta:
         """Мета-класс для настройки сериализатора."""
-
         model = User
         fields = [
             'id',
@@ -312,7 +309,6 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'password',
-            'avatar',
         ]
         extra_kwargs = {'password': {'write_only': True}}
 
