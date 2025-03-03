@@ -34,7 +34,6 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     parser_classes = (MultiPartParser, FormParser, JSONParser)
-    authentication_classes = [TokenAuthentication]
 
     def get_serializer_class(self):
         """Выбор сериализатора в зависимости от метода запроса."""

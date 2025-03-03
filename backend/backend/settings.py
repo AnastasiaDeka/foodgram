@@ -7,11 +7,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', get_random_secret_key())
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
-
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-#ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
 
 
 
@@ -68,16 +66,16 @@ TEMPLATES = [
 WSGI_APPLICATION = 'backend.wsgi.application'
 
 
-#DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.postgresql',
-#        'NAME': os.getenv('POSTGRES_DB', 'kittygram_db'),
-#        'USER': os.getenv('POSTGRES_USER', 'kittygram_user'),
-#        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'kittygram_password'),
-#        'HOST': os.getenv('DB_HOST', 'db'),
-#        'PORT': os.getenv('DB_PORT', 5432)
-#    }
-#}
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('POSTGRES_DB', 'kittygram_db'),
+        'USER': os.getenv('POSTGRES_USER', 'kittygram_user'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'kittygram_password'),
+        'HOST': os.getenv('DB_HOST', 'db'),
+        'PORT': os.getenv('DB_PORT', 5432)
+    }
+}
 
 DATABASES = {
        'default': {
