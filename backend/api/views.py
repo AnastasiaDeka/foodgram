@@ -7,15 +7,15 @@ from django.db.models import Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
-                            ShoppingCart, Subscription)
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
-from rest_framework.authentication import TokenAuthentication
+
+from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
+                            ShoppingCart, Subscription)
 from users.models import User
 
 from .filters import IngredientSearchFilter, RecipeFilter
@@ -23,9 +23,10 @@ from .pagination import PaginatorWithLimit
 from .permissions import IsAuthorOrAdminOrReadOnly
 from .serializers import (AvatarUpdateSerializer, IngredientSerializer,
                           RecipeCreateUpdateSerializer, RecipeSerializer,
-                          SetPasswordSerializer, SubscriptionSerializer,
-                          UserCreateSerializer, UserProfileSerializer,
-                          UserSerializer, UserUpdateSerializer)
+                          SetPasswordSerializer, ShoppingCartRecipeSerializer,
+                          SubscriptionSerializer, UserCreateSerializer,
+                          UserProfileSerializer, UserSerializer,
+                          UserUpdateSerializer)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -78,7 +79,9 @@ class UserViewSet(viewsets.ModelViewSet):
                     os.remove(old_avatar_path)
 
                 return Response(
-                    UserSerializer(user, context={'request': request}).data,
+                    AvatarUpdateSerializer(
+                        user, context={'request': request}
+                    ).data,
                     status=status.HTTP_200_OK
                 )
             return Response(
@@ -188,6 +191,12 @@ class UserViewSet(viewsets.ModelViewSet):
         """Подписка и отписка от автора."""
         author = get_object_or_404(User, id=pk)
 
+        if author == request.user:
+            return Response(
+                {'errors': 'Нельзя подписаться на самого себя.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         if request.method == 'POST':
             if Subscription.objects.filter(
                 user=request.user,
@@ -256,24 +265,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Получение отфильтрованного списка рецептов."""
-        queryset = Recipe.objects.all()
-        user = self.request.user
-        author_id = self.request.query_params.get('author')
-
-        if author_id:
-            queryset = queryset.filter(author_id=author_id)
-
-        if user.is_authenticated:
-            if self.request.query_params.get('is_favorited') == '1':
-                queryset = queryset.filter(favorited_by__user=user)
-
-        if (
-            self.request.query_params.get('is_in_shopping_cart') == '1'
-            and user.is_authenticated
-        ):
-            queryset = queryset.filter(in_shopping_cart__user=user)
-
-        return queryset.order_by('-id')
+        queryset = super().get_queryset().order_by('-id')
+        if self.request.user.is_authenticated:
+            queryset = queryset.select_related('author')
+        return queryset
 
     def get_serializer_class(self):
         """Выбор сериализатора в зависимости от действия."""
@@ -284,6 +279,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Сохранение рецепта с указанием автора."""
         serializer.save(author=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        """Обновление рецепта с проверкой наличия tags."""
+        if 'tags' not in request.data:
+            return Response(
+                {'tags': 'Поле tags обязательно для заполнения.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().update(request, *args, **kwargs)
 
     @action(
         detail=True,
@@ -306,7 +310,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 )
 
             ShoppingCart.objects.create(user=user, recipe=recipe)
-            serializer = RecipeSerializer(recipe)
+            serializer = ShoppingCartRecipeSerializer(recipe)
             return Response(
                 serializer.data,
                 status=status.HTTP_201_CREATED
@@ -379,7 +383,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 )
 
             favorite = Favorite.objects.create(user=user, recipe=recipe)
-            serializer = RecipeSerializer(recipe)
+            serializer = ShoppingCartRecipeSerializer(recipe)
             return Response(
                 serializer.data,
                 status=status.HTTP_201_CREATED
@@ -398,6 +402,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def get_link(self, request, pk=None):
         """Получение прямой короткой ссылки на рецепт."""
         recipe = get_object_or_404(Recipe, id=pk)
+
         return Response({
-            'short_link': f'{request.get_host()}/recipes/{recipe.pk}/'
+            'short-link': f'{request.get_host()}/recipes/{recipe.pk}/'
         })
