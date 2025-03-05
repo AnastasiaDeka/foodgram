@@ -15,6 +15,7 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from users.models import User
 
 from .filters import IngredientSearchFilter, RecipeFilter
@@ -263,10 +264,27 @@ class RecipeViewSet(viewsets.ModelViewSet):
     serializer_class = RecipeSerializer
 
     def get_queryset(self):
-        """Получение отфильтрованного списка рецептов."""
+        """Получение отфильтрованного списка рецептов с учетом лимита."""
         queryset = super().get_queryset().order_by('-id')
+
+        recipes_limit = self.request.query_params.get('recipes_limit', None)
+
+        max_limit = 200
+
+        if recipes_limit:
+            try:
+                recipes_limit = int(recipes_limit)
+                if recipes_limit > max_limit:
+                    recipes_limit = max_limit
+                queryset = queryset[:recipes_limit]
+            except ValueError:
+                raise ValidationError(
+                    "Invalid value for 'recipes_limit'. It must be an integer."
+                )
+
         if self.request.user.is_authenticated:
             queryset = queryset.select_related('author')
+
         return queryset
 
     def get_serializer_class(self):

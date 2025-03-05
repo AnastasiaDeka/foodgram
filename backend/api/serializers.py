@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from drf_base64.fields import Base64ImageField
 from recipes.models import Ingredient, Recipe, RecipeIngredient, Subscription
+from rest_framework.exceptions import ValidationError
 from rest_framework import serializers
 from tags.models import Tag
 
@@ -452,7 +453,16 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     def get_recipes(self, obj):
         """Получение рецептов автора с учетом лимита."""
-        recipes_limit = self.context.get('recipes_limit')
+        recipes_limit = self.context['request'].query_params.get(
+            'recipes_limit', 2
+        )
+        try:
+            recipes_limit = int(recipes_limit)
+        except ValueError:
+            raise ValidationError(
+                "Invalid value for 'recipes_limit'. It must be an integer."
+            )
+
         recipes = obj.subscribed_user.recipes.all()[:recipes_limit]
 
         return ShoppingCartRecipeSerializer(
