@@ -229,27 +229,14 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         """Обновление существующего рецепта."""
+        instance.ingredients.clear()
         tags = validated_data.pop('tags', None)
-        ingredients = validated_data.pop('ingredients', None)
+        ingredients_data = validated_data.pop('ingredients', None)
+        instance.tags.set(tags)
+        instance.recipe_ingredients.all().delete()
+        self._create_ingredients(instance, ingredients_data)
+        return super().update(instance, validated_data)
 
-        if ingredients is None:
-            raise serializers.ValidationError(
-                {'ingredients': 'Это поле обязательно при обновлении рецепта.'}
-            )
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        if tags is not None:
-            instance.tags.clear()
-            instance.tags.set(tags)
-
-        if ingredients is not None:
-            instance.recipe_ingredients.all().delete()
-            self._create_ingredients(instance, ingredients)
-
-        return instance
 
     def _create_ingredients(self, recipe, ingredients):
         """Вспомогательный метод для создания ингредиентов."""
