@@ -151,7 +151,7 @@ class ShoppingCartRecipeSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'cooking_time', 'image')
 
 
-cclass RecipeCreateUpdateSerializer(serializers.ModelSerializer):
+class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания и обновления рецепта."""
 
     image = Base64ImageField(use_url=True)
