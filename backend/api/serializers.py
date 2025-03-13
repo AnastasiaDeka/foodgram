@@ -222,32 +222,34 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         tags = validated_data.pop('tags')
         ingredients = validated_data.pop('ingredients')
         recipe = Recipe.objects.create(**validated_data)
-        self.process_ingredients(recipe, ingredients, tags)
+        recipe.tags.set(tags)
+
+        self._create_ingredients(recipe, ingredients)
         return recipe
 
     def update(self, instance, validated_data):
         """Обновление существующего рецепта."""
-        instance.ingredients.clear()
         tags = validated_data.pop('tags', None)
         ingredients = validated_data.pop('ingredients', None)
-        instance.tags.set(tags)
-        instance.recipe_ingredients.all().delete()
-        self.process_ingredients(instance, ingredients, tags)
-        return super().update(instance, validated_data)
 
-    def process_ingredients(self, recipe, ingredients, tags):
-        """Добавление ингредиентов и тегов."""
-        amount_ingredients = []
-        for ingredient in ingredients:
-            ingredient_instance = {**ingredient}
-            ingredient_id = ingredient_instance.get('id')
-            amount = ingredient_instance.get('amount')
-            amount_ingredients.append(RecipeIngredient(
-                ingredient_id=ingredient_id.id,
-                amount=amount,
-                recipe_id=recipe.id))
-        RecipeIngredient.objects.bulk_create(amount_ingredients)
-        recipe.tags.set(tags)
+        if ingredients is None:
+            raise serializers.ValidationError(
+                {'ingredients': 'Это поле обязательно при обновлении рецепта.'}
+            )
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if tags is not None:
+            instance.tags.clear()
+            instance.tags.set(tags)
+
+        if ingredients is not None:
+            instance.recipe_ingredients.all().delete()
+            self._create_ingredients(instance, ingredients)
+
+        return instance
 
     def _create_ingredients(self, recipe, ingredients):
         """Вспомогательный метод для создания ингредиентов."""
