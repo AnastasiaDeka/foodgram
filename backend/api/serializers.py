@@ -237,7 +237,6 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         self._create_ingredients(instance, ingredients_data)
         return super().update(instance, validated_data)
 
-
     def _create_ingredients(self, recipe, ingredients):
         """Вспомогательный метод для создания ингредиентов."""
         recipe_ingredients = [
