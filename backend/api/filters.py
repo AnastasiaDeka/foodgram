@@ -8,7 +8,6 @@ from recipes.models import Ingredient, Recipe
 class RecipeFilter(FilterSet):
     """Фильтр для рецептов с поддержкой избранного и корзины покупок."""
 
-    author = django_filters.NumberFilter(field_name='author__id')
     is_favorited = django_filters.CharFilter(method='filter_is_favorited')
     is_in_shopping_cart = django_filters.CharFilter(
         method='filter_is_in_shopping_cart'
@@ -19,27 +18,20 @@ class RecipeFilter(FilterSet):
         """Метаданные фильтрации для модели Recipe."""
 
         model = Recipe
-        fields = ['author', 'tags', 'is_favorited', 'is_in_shopping_cart']
-
-    def _str_to_bool(self, value):
-        """Конвертация строковых значений в булевы."""
-        return str(value).lower() in ('true', '1')
+        fields = ('author', 'tags', 'is_favorited', 'is_in_shopping_cart')
 
     def filter_is_favorited(self, queryset, name, value):
         """Фильтрация рецептов, добавленных в избранное."""
         user = self.request.user
-        if self._str_to_bool(value) and not user.is_anonymous:
+        if value == "1" and user.is_authenticated:
             return queryset.filter(favorited_by__user=user)
         return queryset
 
     def filter_is_in_shopping_cart(self, queryset, name, value):
         """Фильтрация рецептов, находящихся в корзине покупок."""
         user = self.request.user
-        if not user.is_authenticated:
-            return queryset
-
-        if str(value).lower() in ("1", "true", "yes"):
-            return queryset.filter(in_shopping_cart__user=user)
+        if value == '1' and user.is_authenticated:
+            return queryset.filter(shopping_cart__user=user)
         return queryset
 
 
@@ -47,7 +39,7 @@ class IngredientSearchFilter(django_filters.FilterSet):
     """Фильтр для ингредиентов по названию."""
 
     name = django_filters.CharFilter(
-        field_name='name', lookup_expr='istartswith'
+        field_name='name', lookup_expr='icontains'
     )
 
     class Meta:

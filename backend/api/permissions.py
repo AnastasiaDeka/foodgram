@@ -18,15 +18,14 @@ class IsAuthorOrReadOnly(BasePermission):
 
 class IsAuthorOrAdminOrReadOnly(BasePermission):
     """Разрешает редактирование только автору рецепта или администратору.
-
     Остальным пользователям — только чтение.
     """
 
     def has_object_permission(self, request, view, obj):
         """Проверяет наличие прав на выполнение действия."""
-        if request.method in SAFE_METHODS:
-            return True
-        return request.user.is_staff or obj.author == request.user
+        return request.method in SAFE_METHODS or (
+            request.user == obj.author or request.user.is_staff
+        )
 
 
 class IsAdminOrReadOnly(BasePermission):

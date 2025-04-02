@@ -1,11 +1,13 @@
 """Модели для приложения рецептов."""
 
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
 from tags.models import Tag
 from users.models import User
 
+MAX_COOKING_TIME = 600
+MAX_INGREDIENT_AMOUNT = 5000
 
 class Ingredient(models.Model):
     """Модель ингредиента."""
@@ -18,9 +20,9 @@ class Ingredient(models.Model):
 
     name = models.CharField(
         max_length=200,
-        unique=True,
         verbose_name='Название ингредиента'
     )
+
     measurement_unit = models.CharField(
         max_length=50,
         choices=MEASUREMENT_UNITS,
@@ -34,6 +36,7 @@ class Ingredient(models.Model):
         ordering = ['name']
         verbose_name = 'Ингредиент'
         verbose_name_plural = 'Ингредиенты'
+        unique_together = ('name', 'measurement_unit')
 
     def __str__(self):
         """Возвращает строковое представление ингредиента."""
@@ -69,8 +72,12 @@ class Recipe(models.Model):
         related_name='recipes',
         verbose_name='Теги'
     )
-    cooking_time = models.PositiveIntegerField(
-        validators=[MinValueValidator(1)],
+    cooking_time = models.PositiveSmallIntegerField(
+        validators=[
+            MinValueValidator(1,
+                              message="Время приготовления должно быть не менее 1 минуты."), 
+            MaxValueValidator(MAX_COOKING_TIME, message=f"Время приготовления не может превышать {MAX_COOKING_TIME} минут.")
+        ],
         verbose_name='Время приготовления (мин)'
     )
     published_at = models.DateTimeField(
@@ -85,28 +92,31 @@ class Recipe(models.Model):
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
 
-    def __str__(self):
+    def __str__(self): 
         """Возвращает строковое представление рецепта."""
         return self.name
 
 
-class RecipeIngredient(models.Model):
+class RecipeIngredient(models.Model): 
     """Промежуточная модель для связи рецепта с ингредиентами."""
-
+ 
     recipe = models.ForeignKey(
-        Recipe,
+        Recipe, 
         on_delete=models.CASCADE,
         related_name='recipe_ingredients',
         verbose_name='Рецепт'
-    )
+    ) 
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
         related_name='ingredient_recipes',
         verbose_name='Ингредиент'
-    )
-    amount = models.PositiveIntegerField(
-        validators=[MinValueValidator(1)],
+    ) 
+    amount = models.PositiveSmallIntegerField(
+        validators=[
+            MinValueValidator(1, message="Количество ингредиента должно быть не менее 1."),
+            MaxValueValidator(MAX_INGREDIENT_AMOUNT, message=f"Количество не может превышать {MAX_INGREDIENT_AMOUNT}.")
+        ],
         verbose_name='Количество'
     )
 
@@ -183,6 +193,10 @@ class ShoppingCart(models.Model):
         related_name='in_shopping_cart',
         verbose_name='Рецепт'
     )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата добавления'
+    )
 
     class Meta:
         """Мета-класс для настройки списка покупок."""
@@ -199,7 +213,6 @@ class ShoppingCart(models.Model):
     def __str__(self):
         """Возвращает строковое представление рецепта в списке покупок."""
         return f'{self.user} добавил {self.recipe} в список покупок'
-
 
 class Subscription(models.Model):
     """Модель подписки."""
