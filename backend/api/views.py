@@ -1,6 +1,5 @@
 """ViewSet модули для API."""
 
-import os
 from datetime import datetime
 
 from django.db.models import Sum
@@ -8,6 +7,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet as DjoserUserViewSet
+from djoser.serializers import SetPasswordSerializer, UserCreateSerializer
 from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
                             ShoppingCart, Subscription)
 from rest_framework import filters, status, viewsets
@@ -23,6 +23,7 @@ from tags.models import Tag
 from .filters import IngredientSearchFilter, RecipeFilter
 from .pagination import PaginatorWithLimit
 from .permissions import IsAuthorOrAdminOrReadOnly
+from djoser.views import UserViewSet as DjoserUserViewSet
 from .serializers import (AvatarUpdateSerializer, IngredientSerializer,
                           RecipeCreateUpdateSerializer, RecipeSerializer,
                           FavoriteSerializer, ShoppingCartSerializer,
@@ -48,14 +49,26 @@ class UserViewSet(DjoserUserViewSet):
 
     def get_serializer_class(self):
         """Выбор сериализатора в зависимости от метода запроса."""
+        print(f"Выбор сериализатора: action={self.action}, method={self.request.method}")
+
         if self.action == 'me':
+            print("Выбран UserProfileSerializer")
             return UserProfileSerializer
+        if self.action == 'set_password':
+            print("Выбран SetPasswordSerializer")
+            return SetPasswordSerializer
+        if self.request.method == 'POST':
+            print("Выбран UserCreateSerializer")
+            return UserCreateSerializer
         if self.request.method == 'GET':
+            print("Выбран UserSerializer")
             return UserSerializer
+
+        print("Выбран UserUpdateSerializer")
         return UserUpdateSerializer
 
 
-    @action(detail=False, methods=['put'])
+    @action(detail=False, methods=['put'], url_path='me/avatar')
     def update_avatar(self, request):
         """Обновление аватара пользователя."""
         user = request.user
@@ -82,15 +95,20 @@ class UserViewSet(DjoserUserViewSet):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
     @action(
         detail=False,
         methods=['get'],
         permission_classes=[IsAuthenticated]
     )
     def me(self, request):
-        """Получение данных текущего пользователя."""
-        super().retrieve(request)
+        """Получение данных текущего пользователя с использованием сериализатора UserSerializer."""
+        response = super().me(request)
+
+        serializer = UserSerializer(request.user, context={'request': request})
+
+        response.data = serializer.data
+
+        return response
 
     @action(
         detail=False,
@@ -126,9 +144,10 @@ class UserViewSet(DjoserUserViewSet):
         """Подписка на автора."""
         author = get_object_or_404(User, id=pk)
         serializer = SubscriptionCreateSerializer(
-            data={'subscribed_user': author.id},
-            context={'request': request}
+            data={'subscribed_user': author.id, 'user': request.user.id}
         )
+
+
         serializer.is_valid(raise_exception=True)
         subscription = serializer.save(user=request.user)
 
@@ -183,7 +202,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         """Получение отфильтрованного списка рецептов с учетом лимита."""
         queryset = super().get_queryset().order_by('-id')
 
-
+        recipes_limit = self.request.query_params.get('recipes_limit')
         max_limit = 200
 
         if recipes_limit:
@@ -326,3 +345,5 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return Response({
             'short-link': f'{request.get_host()}/recipes/{recipe.pk}/'
         })
+
+
