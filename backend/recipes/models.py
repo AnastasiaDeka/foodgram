@@ -1,13 +1,18 @@
 """Модели для приложения рецептов."""
 
-from django.core.validators import MinValueValidator, MaxValueValidator
+import random
+import string
+
+from api.constants import (MAX_COOKING_TIME, MAX_INGREDIENT_AMOUNT,
+                           MAX_INGREDIENT_NAME_LENGTH,
+                           MAX_MEASUREMENT_UNIT_LENGTH, MAX_RECIPE_NAME_LENGTH,
+                           MAX_SHORT_LINK_LENGTH)
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 from tags.models import Tag
 from users.models import User
 
-MAX_COOKING_TIME = 600
-MAX_INGREDIENT_AMOUNT = 5000
 
 class Ingredient(models.Model):
     """Модель ингредиента."""
@@ -19,12 +24,12 @@ class Ingredient(models.Model):
     ]
 
     name = models.CharField(
-        max_length=200,
+        max_length=MAX_INGREDIENT_NAME_LENGTH,
         verbose_name='Название ингредиента'
     )
 
     measurement_unit = models.CharField(
-        max_length=50,
+        max_length=MAX_MEASUREMENT_UNIT_LENGTH,
         choices=MEASUREMENT_UNITS,
         default='шт',
         verbose_name='Единица измерения'
@@ -33,7 +38,7 @@ class Ingredient(models.Model):
     class Meta:
         """Мета-класс для настройки порядка и отображения ингредиентов."""
 
-        ordering = ['name']
+        ordering = ('name',)
         verbose_name = 'Ингредиент'
         verbose_name_plural = 'Ингредиенты'
         unique_together = ('name', 'measurement_unit')
@@ -53,7 +58,7 @@ class Recipe(models.Model):
         verbose_name='Автор рецепта'
     )
     name = models.CharField(
-        max_length=256,
+        max_length=MAX_RECIPE_NAME_LENGTH,
         verbose_name='Название рецепта'
     )
     image = models.ImageField(
@@ -74,9 +79,19 @@ class Recipe(models.Model):
     )
     cooking_time = models.PositiveSmallIntegerField(
         validators=[
-            MinValueValidator(1,
-                              message="Время приготовления должно быть не менее 1 минуты."), 
-            MaxValueValidator(MAX_COOKING_TIME, message=f"Время приготовления не может превышать {MAX_COOKING_TIME} минут.")
+            MinValueValidator(
+                1,
+                message=(
+                    'Время приготовления должно быть не менее 1 минуты.'
+                ),
+            ),
+            MaxValueValidator(
+                MAX_COOKING_TIME,
+                message=(
+                    'Время приготовления не может превышать '
+                    f'{MAX_COOKING_TIME} минут.'
+                ),
+            ),
         ],
         verbose_name='Время приготовления (мин)'
     )
@@ -84,6 +99,24 @@ class Recipe(models.Model):
         default=timezone.now,
         verbose_name='Дата публикации'
     )
+    short_link = models.CharField(
+        max_length=MAX_SHORT_LINK_LENGTH,
+        blank=True,
+        null=True,
+        verbose_name='Короткая ссылка'
+    )
+
+    def generate_short_link(self):
+        """Генерация случайной строки для короткой ссылки."""
+        return ''.join(
+            random.choices(string.ascii_letters + string.digits, k=6)
+        )
+
+    def save(self, *args, **kwargs):
+        """Переопределение метода save для генерации короткой ссылки."""
+        if not self.short_link:
+            self.short_link = self.generate_short_link()
+        super().save(*args, **kwargs)
 
     class Meta:
         """Мета-класс для настройки порядка и отображения рецептов."""
@@ -92,30 +125,39 @@ class Recipe(models.Model):
         verbose_name = 'Рецепт'
         verbose_name_plural = 'Рецепты'
 
-    def __str__(self): 
+    def __str__(self):
         """Возвращает строковое представление рецепта."""
-        return self.name
+        return f"Рецепт: {self.name} (ID: {self.id})"
 
 
-class RecipeIngredient(models.Model): 
+class RecipeIngredient(models.Model):
     """Промежуточная модель для связи рецепта с ингредиентами."""
- 
+
     recipe = models.ForeignKey(
-        Recipe, 
+        Recipe,
         on_delete=models.CASCADE,
         related_name='recipe_ingredients',
         verbose_name='Рецепт'
-    ) 
+    )
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
         related_name='ingredient_recipes',
         verbose_name='Ингредиент'
-    ) 
+    )
     amount = models.PositiveSmallIntegerField(
         validators=[
-            MinValueValidator(1, message="Количество ингредиента должно быть не менее 1."),
-            MaxValueValidator(MAX_INGREDIENT_AMOUNT, message=f"Количество не может превышать {MAX_INGREDIENT_AMOUNT}.")
+            MinValueValidator(
+                1,
+                message='Количество ингредиента должно быть не менее 1.'
+            ),
+            MaxValueValidator(
+                MAX_INGREDIENT_AMOUNT,
+                message=(
+                    'Количество не может превышать '
+                    f'{MAX_INGREDIENT_AMOUNT}.'
+                ),
+            ),
         ],
         verbose_name='Количество'
     )
@@ -123,7 +165,7 @@ class RecipeIngredient(models.Model):
     class Meta:
         """Мета-класс для настройки ингредиентов в рецепте."""
 
-        ordering = ['recipe']
+        ordering = ('recipe',)
         constraints = [
             models.UniqueConstraint(
                 fields=['recipe', 'ingredient'],
@@ -136,7 +178,8 @@ class RecipeIngredient(models.Model):
     def __str__(self):
         """Возвращает строковое представление ингредиента в рецепте."""
         return (
-            f'{self.amount} {self.ingredient.measurement_unit} '
+            '{self.amount} '
+            f'{self.ingredient.measurement_unit} '
             f'{self.ingredient.name}'
         )
 
@@ -213,6 +256,7 @@ class ShoppingCart(models.Model):
     def __str__(self):
         """Возвращает строковое представление рецепта в списке покупок."""
         return f'{self.user} добавил {self.recipe} в список покупок'
+
 
 class Subscription(models.Model):
     """Модель подписки."""

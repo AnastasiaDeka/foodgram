@@ -3,11 +3,11 @@
 from datetime import datetime
 
 from django.db.models import Sum
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from djoser.views import UserViewSet as DjoserUserViewSet
 from djoser.serializers import SetPasswordSerializer, UserCreateSerializer
+from djoser.views import UserViewSet as DjoserUserViewSet
 from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
                             ShoppingCart, Subscription)
 from rest_framework import filters, status, viewsets
@@ -17,20 +17,18 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import (AllowAny, IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
-from users.models import User
 from tags.models import Tag
+from users.models import User
 
 from .filters import IngredientSearchFilter, RecipeFilter
 from .pagination import PaginatorWithLimit
 from .permissions import IsAuthorOrAdminOrReadOnly
-from djoser.views import UserViewSet as DjoserUserViewSet
-from .serializers import (AvatarUpdateSerializer, IngredientSerializer,
-                          RecipeCreateUpdateSerializer, RecipeSerializer,
-                          FavoriteSerializer, ShoppingCartSerializer,
-                          SubscriptionCreateSerializer,
-                          SubscriptionSerializer,
-                          UserProfileSerializer, UserSerializer,
-                          UserUpdateSerializer, TagSerializer)
+from .serializers import (AvatarUpdateSerializer, FavoriteSerializer,
+                          IngredientSerializer, RecipeCreateUpdateSerializer,
+                          RecipeSerializer, ShoppingCartSerializer,
+                          SubscriptionCreateSerializer, SubscriptionSerializer,
+                          TagSerializer, UserProfileSerializer, UserSerializer,
+                          UserUpdateSerializer)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -39,6 +37,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Tag.objects.all().order_by('id')
     serializer_class = TagSerializer
     pagination_class = None
+
 
 class UserViewSet(DjoserUserViewSet):
     """ViewSet для работы с пользователями."""
@@ -49,24 +48,16 @@ class UserViewSet(DjoserUserViewSet):
 
     def get_serializer_class(self):
         """Выбор сериализатора в зависимости от метода запроса."""
-        print(f"Выбор сериализатора: action={self.action}, method={self.request.method}")
-
         if self.action == 'me':
-            print("Выбран UserProfileSerializer")
             return UserProfileSerializer
         if self.action == 'set_password':
-            print("Выбран SetPasswordSerializer")
             return SetPasswordSerializer
         if self.request.method == 'POST':
-            print("Выбран UserCreateSerializer")
             return UserCreateSerializer
         if self.request.method == 'GET':
-            print("Выбран UserSerializer")
             return UserSerializer
 
-        print("Выбран UserUpdateSerializer")
         return UserUpdateSerializer
-
 
     @action(detail=False, methods=['put'], url_path='me/avatar')
     def update_avatar(self, request):
@@ -81,7 +72,7 @@ class UserViewSet(DjoserUserViewSet):
         serializer.save()
 
         return Response(
-            AvatarUpdateSerializer(user, context={'request': request}).data,
+            serializer.data,
             status=status.HTTP_200_OK
         )
 
@@ -101,10 +92,13 @@ class UserViewSet(DjoserUserViewSet):
         permission_classes=[IsAuthenticated]
     )
     def me(self, request):
-        """Получение данных текущего пользователя с использованием сериализатора UserSerializer."""
+        """Получение данных текущего пользователя."""
         response = super().me(request)
 
-        serializer = UserSerializer(request.user, context={'request': request})
+        serializer = UserSerializer(
+            request.user,
+            context={'request': request}
+        )
 
         response.data = serializer.data
 
@@ -126,6 +120,8 @@ class UserViewSet(DjoserUserViewSet):
             .order_by('-id')
         )
 
+        print(f"Запрос на подписки. Найдено {queryset.count()} подписок.")
+
         page = self.paginate_queryset(queryset)
 
         serializer = SubscriptionSerializer(
@@ -138,29 +134,40 @@ class UserViewSet(DjoserUserViewSet):
     @action(
         detail=True,
         methods=['post'],
-        permission_classes=[IsAuthenticated]
+        permission_classes=[IsAuthenticated],
+        url_path='subscribe'
     )
-    def subscribe(self, request, pk=None):
+    def subscribe(self, request, id=None):
         """Подписка на автора."""
-        author = get_object_or_404(User, id=pk)
+        author = get_object_or_404(User, id=id)
+
+        data = {'subscribed_user': author.id, 'user': self.request.user.id}
+
         serializer = SubscriptionCreateSerializer(
-            data={'subscribed_user': author.id, 'user': request.user.id}
+            data=data,
+            context={'request': request}
         )
 
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        serializer.is_valid(raise_exception=True)
         subscription = serializer.save(user=request.user)
 
         return Response(
-            SubscriptionSerializer(subscription, context={'request': request}).data,
+            SubscriptionSerializer(
+                subscription,
+                context={'request': request}
+            ).data,
             status=status.HTTP_201_CREATED
         )
 
-
     @subscribe.mapping.delete
-    def unsubscribe(self, request, pk=None):
+    def unsubscribe(self, request, id=None):
         """Отписка от автора."""
-        author = get_object_or_404(User, id=pk)
+        author = get_object_or_404(User, id=id)
 
         subscription = Subscription.objects.filter(
             user=request.user,
@@ -202,8 +209,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         """Получение отфильтрованного списка рецептов с учетом лимита."""
         queryset = super().get_queryset().order_by('-id')
 
-        recipes_limit = self.request.query_params.get('recipes_limit')
         max_limit = 200
+        recipes_limit = self.request.query_params.get('recipes_limit')
 
         if recipes_limit:
             try:
@@ -230,14 +237,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=['post'],
-        permission_classes=[IsAuthenticated]
+        permission_classes=[IsAuthenticated],
+        url_path='shopping_cart'
     )
     def add_to_shopping_cart(self, request, pk=None):
         """Добавление рецепта в корзину."""
         recipe = get_object_or_404(Recipe, id=pk)
         user = request.user
 
-        serializer = ShoppingCartSerializer(data={'user': user.id, 'recipe': recipe.id})
+        serializer = ShoppingCartSerializer(
+            data={'user': user.id, 'recipe': recipe.id},
+            context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
@@ -252,7 +263,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
         recipe = get_object_or_404(Recipe, id=pk)
         user = request.user
 
-        shopping_cart = ShoppingCart.objects.filter(user=user, recipe=recipe).first()
+        shopping_cart = ShoppingCart.objects.filter(
+            user=user,
+            recipe=recipe
+        ).first()
 
         if not shopping_cart:
             return Response(
@@ -303,13 +317,17 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=['post'],
-        permission_classes=[IsAuthenticated]
+        permission_classes=[IsAuthenticated],
+        url_path='favorite'
     )
     def add_to_favorite(self, request, pk=None):
         """Добавление рецепта в избранное."""
         recipe = get_object_or_404(Recipe, id=pk)
         user = request.user
-        serializer = FavoriteSerializer(data={'user': user.id, 'recipe': recipe.id})
+        serializer = FavoriteSerializer(
+            data={'user': user.id,
+                  'recipe': recipe.id}, context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
@@ -321,7 +339,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @add_to_favorite.mapping.delete
     def remove_from_favorite(self, request, pk=None):
         """Удаление рецепта из избранного."""
-        favorite = Favorite.objects.filter(user=request.user, recipe_id=pk).first()
+        favorite = Favorite.objects.filter(
+            user=request.user,
+            recipe_id=pk
+        ).first()
 
         if not favorite:
             return Response(
@@ -339,11 +360,23 @@ class RecipeViewSet(viewsets.ModelViewSet):
         url_path='get-link'
     )
     def get_link(self, request, pk=None):
-        """Получение прямой короткой ссылки на рецепт."""
+        """Получение короткой ссылки на рецепт."""
         recipe = get_object_or_404(Recipe, id=pk)
 
+        short_link = f'{request.get_host()}/recipes/{recipe.short_link}/'
+
         return Response({
-            'short-link': f'{request.get_host()}/recipes/{recipe.pk}/'
+            'short-link': short_link
         })
 
+    @action(
+        detail=True,
+        methods=['get'],
+        permission_classes=[AllowAny],
+        url_path='short-link-redirect'
+    )
+    def short_link_redirect(self, request, short_link=None):
+        """Перенаправление по короткой ссылке на рецепт."""
+        recipe = get_object_or_404(Recipe, short_link=short_link)
 
+        return HttpResponseRedirect(f'/recipes/{recipe.pk}/')
