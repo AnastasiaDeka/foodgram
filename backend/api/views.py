@@ -59,7 +59,11 @@ class UserViewSet(DjoserUserViewSet):
 
         return UserUpdateSerializer
 
-    @action(detail=False, methods=['put'], url_path='me/avatar')
+    @action(
+        detail=False,
+        methods=['put'],
+        url_path='me/avatar',
+        permission_classes=[IsAuthenticated])
     def update_avatar(self, request):
         """Обновление аватара пользователя."""
         user = request.user
@@ -77,7 +81,10 @@ class UserViewSet(DjoserUserViewSet):
         )
 
     @update_avatar.mapping.delete
-    def delete_avatar(self, request):
+    def delete_avatar(
+        self,
+        request,
+        permission_classes=[IsAuthenticated]):
         """Удаление аватара пользователя."""
         user = request.user
         if user.avatar:
