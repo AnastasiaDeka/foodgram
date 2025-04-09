@@ -380,7 +380,10 @@ class SubscriptionSerializer(UserSerializer):
     def get_recipes(self, obj):
         """Получает ограниченный список рецептов подписанного пользователя."""
         request = self.context.get('request')
-        recipes_limit = request.query_params.get('recipes_limit') if request else None
+        recipes_limit = (
+            request.query_params.get('recipes_limit')
+            if request else None
+        )
         recipes = obj.subscribed_user.recipes.all()
 
         if recipes_limit and recipes_limit.isdigit():

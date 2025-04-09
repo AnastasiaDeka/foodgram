@@ -81,10 +81,7 @@ class UserViewSet(DjoserUserViewSet):
         )
 
     @update_avatar.mapping.delete
-    def delete_avatar(
-        self,
-        request,
-        permission_classes=[IsAuthenticated]):
+    def delete_avatar(self, request):
         """Удаление аватара пользователя."""
         user = request.user
         if user.avatar:
