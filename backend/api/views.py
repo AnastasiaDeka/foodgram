@@ -7,23 +7,41 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet as DjoserUserViewSet
-from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
-                            ShoppingCart, Subscription, Tag)
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import (AllowAny, IsAuthenticated,
-                                        IsAuthenticatedOrReadOnly)
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.response import Response
+
+from recipes.models import (
+    Favorite,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingCart,
+    Subscription,
+    Tag,
+)
 from users.models import User
 
 from .filters import IngredientSearchFilter, RecipeFilter
 from .pagination import PaginatorWithLimit
 from .permissions import IsAuthorOrAdminOrReadOnly
-from .serializers import (AvatarUpdateSerializer, FavoriteSerializer,
-                          IngredientSerializer, RecipeCreateUpdateSerializer,
-                          RecipeSerializer, ShoppingCartSerializer,
-                          SubscriptionCreateSerializer, SubscriptionSerializer,
-                          TagSerializer, UserSerializer)
+from .serializers import (
+    AvatarUpdateSerializer,
+    FavoriteSerializer,
+    IngredientSerializer,
+    RecipeCreateUpdateSerializer,
+    RecipeSerializer,
+    ShoppingCartSerializer,
+    SubscriptionCreateSerializer,
+    SubscriptionSerializer,
+    TagSerializer,
+    UserSerializer,
+)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):

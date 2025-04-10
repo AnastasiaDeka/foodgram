@@ -1,8 +1,9 @@
 """Модуль, содержащий модели для работы с пользователями."""
 
-from api.constants import MAX_NAME_LENGTH
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+
+from api.constants import MAX_NAME_LENGTH
 
 
 class User(AbstractUser):

@@ -3,15 +3,22 @@
 import random
 import string
 
-from api.constants import (MAX_COOKING_TIME, MAX_INGREDIENT_AMOUNT,
-                           MAX_INGREDIENT_NAME_LENGTH,
-                           MAX_MEASUREMENT_UNIT_LENGTH, MAX_RECIPE_NAME_LENGTH,
-                           MAX_SHORT_LINK_LENGTH, MAX_SLUG_LENGTH,
-                           MAX_TAG_NAME_LENGTH, MIN_COOKING_TIME,
-                           MIN_INGREDIENT_AMOUNT)
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
+
+from api.constants import (
+    MAX_COOKING_TIME,
+    MAX_INGREDIENT_AMOUNT,
+    MAX_INGREDIENT_NAME_LENGTH,
+    MAX_MEASUREMENT_UNIT_LENGTH,
+    MAX_RECIPE_NAME_LENGTH,
+    MAX_SHORT_LINK_LENGTH,
+    MAX_SLUG_LENGTH,
+    MAX_TAG_NAME_LENGTH,
+    MIN_COOKING_TIME,
+    MIN_INGREDIENT_AMOUNT,
+)
 from users.models import User
 
 
