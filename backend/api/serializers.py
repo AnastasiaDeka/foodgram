@@ -1,10 +1,16 @@
 """Сериализаторы для API."""
 
 from django.contrib.auth import get_user_model
+
 from drf_base64.fields import Base64ImageField
-from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
-                            ShoppingCart, Subscription, Tag)
+
 from rest_framework import serializers
+
+from recipes.models import (
+    Favorite, Ingredient, Recipe, RecipeIngredient,
+    ShoppingCart, Subscription, Tag
+)
+
 
 User = get_user_model()
 
