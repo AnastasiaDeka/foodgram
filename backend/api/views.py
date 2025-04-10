@@ -300,6 +300,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @add_to_favorite.mapping.delete
     def remove_from_favorite(self, request, pk=None):
         """Удаление рецепта из избранного."""
+        if not Recipe.objects.filter(id=pk).exists():
+            return Response(
+                {'error': 'Рецепт не найден.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         deleted_count, _ = Favorite.objects.filter(
             user=request.user,
             recipe_id=pk
