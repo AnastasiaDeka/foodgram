@@ -2,6 +2,7 @@
 
 import django_filters
 from django_filters.rest_framework import FilterSet
+
 from recipes.models import Ingredient, Recipe
 
 
@@ -23,14 +24,14 @@ class RecipeFilter(FilterSet):
     def filter_is_favorited(self, queryset, name, value):
         """Фильтрация рецептов, добавленных в избранное."""
         user = self.request.user
-        if value == "1" and user.is_authenticated:
+        if value and user.is_authenticated:
             return queryset.filter(favorited_by__user=user)
         return queryset
 
     def filter_is_in_shopping_cart(self, queryset, name, value):
         """Фильтрация рецептов, находящихся в корзине покупок."""
         user = self.request.user
-        if value == '1' and user.is_authenticated:
+        if value and user.is_authenticated:
             return queryset.filter(in_shopping_cart__user=user)
         return queryset
 

@@ -6,12 +6,24 @@ import string
 from api.constants import (MAX_COOKING_TIME, MAX_INGREDIENT_AMOUNT,
                            MAX_INGREDIENT_NAME_LENGTH,
                            MAX_MEASUREMENT_UNIT_LENGTH, MAX_RECIPE_NAME_LENGTH,
-                           MAX_SHORT_LINK_LENGTH)
+                           MAX_SHORT_LINK_LENGTH, MAX_SLUG_LENGTH,
+                           MAX_TAG_NAME_LENGTH, MIN_COOKING_TIME,
+                           MIN_INGREDIENT_AMOUNT)
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
-from tags.models import Tag
 from users.models import User
+
+
+class Tag(models.Model):
+    """Модель для тегов."""
+
+    name = models.CharField(max_length=MAX_TAG_NAME_LENGTH, unique=True)
+    slug = models.SlugField(unique=True, max_length=MAX_SLUG_LENGTH)
+
+    def __str__(self):
+        """Возвращает строковое представление тега."""
+        return f"Tag: {self.name} (ID: {self.id})"
 
 
 class Ingredient(models.Model):
@@ -21,6 +33,8 @@ class Ingredient(models.Model):
         ('шт', 'Штуки'),
         ('г', 'Граммы'),
         ('мл', 'Миллилитры'),
+        ('л', 'Литры'),
+        ('кг', 'Килограммы'),
     ]
 
     name = models.CharField(
@@ -80,9 +94,10 @@ class Recipe(models.Model):
     cooking_time = models.PositiveSmallIntegerField(
         validators=[
             MinValueValidator(
-                1,
+                MIN_COOKING_TIME,
                 message=(
-                    'Время приготовления должно быть не менее 1 минуты.'
+                    'Время приготовления должно быть '
+                    f'не менее {MIN_COOKING_TIME} минуты.'
                 ),
             ),
             MaxValueValidator(
@@ -108,9 +123,13 @@ class Recipe(models.Model):
 
     def generate_short_link(self):
         """Генерация случайной строки для короткой ссылки."""
-        return ''.join(
-            random.choices(string.ascii_letters + string.digits, k=6)
-        )
+        while True:
+            short_link = ''.join(random.choices(
+                string.ascii_letters + string.digits, k=6)
+            )
+            if not Recipe.objects.filter(short_link=short_link).exists():
+                break
+        return short_link
 
     def save(self, *args, **kwargs):
         """Переопределение метода save для генерации короткой ссылки."""
@@ -148,8 +167,9 @@ class RecipeIngredient(models.Model):
     amount = models.PositiveSmallIntegerField(
         validators=[
             MinValueValidator(
-                1,
-                message='Количество ингредиента должно быть не менее 1.'
+                MIN_INGREDIENT_AMOUNT,
+                message='Количество ингредиента должно'
+                f'быть не менее {MIN_INGREDIENT_AMOUNT}.'
             ),
             MaxValueValidator(
                 MAX_INGREDIENT_AMOUNT,

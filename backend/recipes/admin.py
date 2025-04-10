@@ -5,7 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 from users.models import User
 
 from .models import (Favorite, Ingredient, Recipe, RecipeIngredient,
-                     ShoppingCart, Subscription)
+                     ShoppingCart, Subscription, Tag)
 
 
 class RecipeIngredientInline(admin.TabularInline):
@@ -86,3 +86,11 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
     list_display = ("user", "subscribed_user", "created_at")
     search_fields = ("user__username", "subscribed_user__username")
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    """Админ-класс для модели Tag."""
+
+    search_fields = ('name',)
+    list_display = ('name', 'slug')

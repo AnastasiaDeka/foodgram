@@ -15,6 +15,8 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
 
 CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
 
+USE_SQLITE = os.getenv('USE_SQLITE', 'False').lower() in ('true', '1')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -24,7 +26,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'recipes.apps.RecipesConfig',
     'users.apps.UsersConfig',
-    'tags.apps.TagsConfig',
     'api.apps.ApiConfig',
     'djoser',
     'rest_framework',
@@ -64,12 +65,15 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(os.path.dirname(__file__), 'db.sqlite3'),
+    } if USE_SQLITE else {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('POSTGRES_DB'),
         'USER': os.getenv('POSTGRES_USER'),
         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
         'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT', 5432)
+        'PORT': os.getenv('DB_PORT', 5432),
     }
 }
 
@@ -125,7 +129,6 @@ DJOSER = {
     'LOGIN_FIELD': 'email',
     'HIDE_USERS': False,
     'SERIALIZERS': {
-        'user_create': 'djoser.serializers.UserCreateSerializer',
         'user': 'api.serializers.UserSerializer',
         'current_user': 'api.serializers.UserSerializer',
     },

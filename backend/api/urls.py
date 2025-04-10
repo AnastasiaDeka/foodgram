@@ -19,7 +19,6 @@ router.register('tags', TagViewSet, basename='tags')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('auth/', include('djoser.urls')),
     path('auth/', include('djoser.urls.authtoken')),
     path('users/me/', UserViewSet.as_view({'get': 'me'}), name='user-me'),
 ]

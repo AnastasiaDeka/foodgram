@@ -1,6 +1,6 @@
 """Модуль, содержащий модели для работы с пользователями."""
 
-from api.constants import MAX_EMAIL_LENGTH, MAX_NAME_LENGTH
+from api.constants import MAX_NAME_LENGTH
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -14,7 +14,6 @@ class User(AbstractUser):
     """
 
     email = models.EmailField(
-        max_length=MAX_EMAIL_LENGTH,
         unique=True,
         verbose_name="Электронная почта"
     )
