@@ -36,14 +36,6 @@ class Tag(models.Model):
 class Ingredient(models.Model):
     """Модель ингредиента."""
 
-    MEASUREMENT_UNITS = [
-        ('шт', 'Штуки'),
-        ('г', 'Граммы'),
-        ('мл', 'Миллилитры'),
-        ('л', 'Литры'),
-        ('кг', 'Килограммы'),
-    ]
-
     name = models.CharField(
         max_length=MAX_INGREDIENT_NAME_LENGTH,
         verbose_name='Название ингредиента'
@@ -51,8 +43,6 @@ class Ingredient(models.Model):
 
     measurement_unit = models.CharField(
         max_length=MAX_MEASUREMENT_UNIT_LENGTH,
-        choices=MEASUREMENT_UNITS,
-        default='шт',
         verbose_name='Единица измерения'
     )
 

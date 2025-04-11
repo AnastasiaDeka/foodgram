@@ -117,7 +117,7 @@ class UserViewSet(DjoserUserViewSet):
         page = self.paginate_queryset(queryset)
 
         serializer = SubscriptionSerializer(
-            page,
+            [subscription.subscribed_user for subscription in page],
             many=True,
             context={'request': request, 'recipes_limit': recipes_limit}
         )
@@ -140,14 +140,14 @@ class UserViewSet(DjoserUserViewSet):
         )
 
         serializer.is_valid(raise_exception=True)
-        subscription = serializer.save()
+        serializer.save()
+
+        response_serializer = SubscriptionSerializer(
+            author, context={'request': request}
+        )
 
         return Response(
-            SubscriptionSerializer(
-                subscription,
-                context={'request': request}
-            ).data,
-            status=status.HTTP_201_CREATED
+            response_serializer.data, status=status.HTTP_201_CREATED
         )
 
     @subscribe.mapping.delete
@@ -160,7 +160,7 @@ class UserViewSet(DjoserUserViewSet):
             subscribed_user=author
         ).delete()
 
-        if deleted_count == 0:
+        if not deleted_count:
             return Response(
                 {'error': 'Вы не подписаны на этого пользователя.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -229,7 +229,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             recipe=recipe
         ).delete()
 
-        if deleted_count == 0:
+        if not deleted_count:
             return Response(
                 {'error': 'Рецепта нет в корзине.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -300,18 +300,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @add_to_favorite.mapping.delete
     def remove_from_favorite(self, request, pk=None):
         """Удаление рецепта из избранного."""
-        if not Recipe.objects.filter(id=pk).exists():
-            return Response(
-                {'error': 'Рецепт не найден.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        get_object_or_404(Recipe, id=pk)
 
         deleted_count, _ = Favorite.objects.filter(
             user=request.user,
             recipe_id=pk
         ).delete()
 
-        if deleted_count == 0:
+        if not deleted_count:
             return Response(
                 {'error': 'Рецепта нет в избранном.'},
                 status=status.HTTP_400_BAD_REQUEST

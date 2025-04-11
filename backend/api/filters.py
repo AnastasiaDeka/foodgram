@@ -47,4 +47,4 @@ class IngredientSearchFilter(django_filters.FilterSet):
         """Метаданные фильтрации для модели Ingredient."""
 
         model = Ingredient
-        fields = ['name']
+        fields = ('name',)

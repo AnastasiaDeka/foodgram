@@ -1,6 +1,5 @@
 """Сериализаторы для API."""
 
-from django.contrib.auth import get_user_model
 from drf_base64.fields import Base64ImageField
 from rest_framework import serializers
 
@@ -13,8 +12,7 @@ from recipes.models import (
     Subscription,
     Tag,
 )
-
-User = get_user_model()
+from users.models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -26,7 +24,7 @@ class UserSerializer(serializers.ModelSerializer):
         """Мета-класс для настройки сериализатора."""
 
         model = User
-        fields = [
+        fields = (
             'id',
             'username',
             'email',
@@ -34,7 +32,7 @@ class UserSerializer(serializers.ModelSerializer):
             'last_name',
             'avatar',
             'is_subscribed',
-        ]
+        )
 
     def get_is_subscribed(self, obj):
         """Проверяет, подписан ли текущий пользователь."""
@@ -42,7 +40,6 @@ class UserSerializer(serializers.ModelSerializer):
         return bool(
             request
             and request.user.is_authenticated
-            and isinstance(obj, User)
             and Subscription.objects.filter(
                 user=request.user, subscribed_user=obj
             ).exists()
@@ -56,7 +53,7 @@ class IngredientSerializer(serializers.ModelSerializer):
         """Мета-класс для настройки сериализатора."""
 
         model = Ingredient
-        fields = ['id', 'name', 'measurement_unit']
+        fields = ('id', 'name', 'measurement_unit')
 
 
 class IngredientAmountSerializer(serializers.ModelSerializer):
@@ -74,7 +71,7 @@ class IngredientAmountSerializer(serializers.ModelSerializer):
         """Мета-класс для настройки сериализатора."""
 
         model = RecipeIngredient
-        fields = ['id', 'name', 'measurement_unit', 'amount']
+        fields = ('id', 'name', 'measurement_unit', 'amount')
 
 
 class IngredientAmountCreateUpdateSerializer(serializers.Serializer):
@@ -252,7 +249,7 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
         """Мета-класс для настройки сериализатора."""
 
         model = Recipe
-        fields = ['id', 'name', 'image', 'cooking_time']
+        fields = ('id', 'name', 'image', 'cooking_time')
 
 
 class ShoppingCartSerializer(serializers.ModelSerializer):
@@ -287,7 +284,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
         """Мета-класс для настройки сериализатора."""
 
         model = Favorite
-        fields = ['user', 'recipe']
+        fields = ('user', 'recipe')
 
     def validate(self, data):
         """Валидируем, чтобы рецепт не был уже в избранном."""
@@ -314,13 +311,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
         """Мета-класс для настройки сериализатора."""
 
         model = User
-        fields = [
+        fields = (
             'id',
             'username',
             'email',
             'first_name',
             'last_name',
-            'avatar']
+            'avatar')
 
     def get_avatar(self, obj):
         """Возвращает URL аватара пользователя."""
@@ -330,26 +327,31 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return None
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
+class SubscriptionSerializer(UserSerializer):
     """Сериализатор для отображения подписок."""
 
-    subscribed_user = UserSerializer(read_only=True)
+    is_subscribed = serializers.SerializerMethodField()
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta(UserSerializer.Meta):
         """Мета-класс для настройки сериализатора."""
 
-        model = Subscription
-        fields = ['subscribed_user', 'recipes', 'recipes_count']
+        fields = (
+            *UserSerializer.Meta.fields,
+            'is_subscribed',
+            'recipes',
+            'recipes_count'
+        )
 
     def get_recipes(self, obj):
         """Получает ограниченный список рецептов подписанного пользователя."""
         request = self.context.get('request')
         recipes_limit = (
-            request.query_params.get('recipes_limit') if request else None
+            request.query_params.get('recipes_limit')
+            if request else None
         )
-        recipes = obj.subscribed_user.recipes.all()
+        recipes = obj.recipes.all()
 
         if recipes_limit and recipes_limit.isdigit():
             recipes = recipes[:int(recipes_limit)]
@@ -360,25 +362,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     def get_recipes_count(self, obj):
         """Получение количества рецептов автора."""
-        return obj.subscribed_user.recipes.count()
-
-    def to_representation(self, instance):
-        """
-        Переопределение метода для добавления недостающих полей.
-
-        в response.
-        """
-        representation = super().to_representation(instance)
-
-        subscribed_user = representation.get('subscribed_user', {})
-        user_serializer = UserSerializer(subscribed_user)
-        user_data = user_serializer.data
-
-        representation.update(user_data)
-
-        representation.pop('subscribed_user')
-
-        return representation
+        return obj.recipes.count()
 
 
 class SubscriptionCreateSerializer(serializers.ModelSerializer):
@@ -418,6 +402,10 @@ class SubscriptionCreateSerializer(serializers.ModelSerializer):
 
         return data
 
+    def to_representation(self, instance):
+        """Возвращает данные в формате SubscriptionSerializer."""
+        return SubscriptionSerializer(instance, context=self.context).data
+
 
 class AvatarUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для обновления аватара пользователя."""
@@ -428,7 +416,7 @@ class AvatarUpdateSerializer(serializers.ModelSerializer):
         """Мета-класс для настройки сериализатора."""
 
         model = User
-        fields = ['avatar']
+        fields = ('avatar',)
 
     def validate(self, data):
         """Глобальная валидация данных."""
