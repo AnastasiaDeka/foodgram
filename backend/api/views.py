@@ -142,12 +142,9 @@ class UserViewSet(DjoserUserViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
-        response_serializer = SubscriptionSerializer(
-            author, context={'request': request}
-        )
-
         return Response(
-            response_serializer.data, status=status.HTTP_201_CREATED
+            serializer.data,
+            status=status.HTTP_201_CREATED
         )
 
     @subscribe.mapping.delete

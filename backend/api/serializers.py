@@ -74,19 +74,19 @@ class IngredientAmountSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'measurement_unit', 'amount')
 
 
-class IngredientAmountCreateUpdateSerializer(serializers.Serializer):
+class IngredientAmountCreateUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для ингредиентов при создании/обновлении рецепта."""
 
-    id = serializers.PrimaryKeyRelatedField(queryset=Ingredient.objects.all())
-    amount = serializers.IntegerField()
+    id = serializers.PrimaryKeyRelatedField(
+        queryset=Ingredient.objects.all(),
+        source='ingredient'
+    )
 
-    def validate_amount(self, value):
-        """Проверка на корректность поля amount."""
-        if value <= 0:
-            raise serializers.ValidationError(
-                'Количество ингредиента должно быть больше нуля.'
-            )
-        return value
+    class Meta:
+        """Мета-класс для настройки сериализатора."""
+
+        model = RecipeIngredient
+        fields = ('id', 'amount')
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -189,7 +189,7 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
                 {'ingredients': 'Нужен хотя бы один ингредиент для рецепта.'}
             )
 
-        ingredient_ids = [item['id'] for item in ingredients]
+        ingredient_ids = [item['ingredient'].id for item in ingredients]
         if len(ingredient_ids) != len(set(ingredient_ids)):
             raise serializers.ValidationError(
                 {'ingredients': 'Ингредиенты не должны повторяться.'}
@@ -231,7 +231,7 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         RecipeIngredient.objects.bulk_create([
             RecipeIngredient(
                 recipe=recipe,
-                ingredient=ingredient['id'],
+                ingredient=ingredient['ingredient'],
                 amount=ingredient['amount'],
             )
             for ingredient in ingredients
@@ -330,7 +330,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class SubscriptionSerializer(UserSerializer):
     """Сериализатор для отображения подписок."""
 
-    is_subscribed = serializers.SerializerMethodField()
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
 
@@ -403,8 +402,10 @@ class SubscriptionCreateSerializer(serializers.ModelSerializer):
         return data
 
     def to_representation(self, instance):
-        """Возвращает данные в формате SubscriptionSerializer."""
-        return SubscriptionSerializer(instance, context=self.context).data
+        """Возвращает данные о подписанном пользователе."""
+        return SubscriptionSerializer(
+            instance.subscribed_user, context=self.context
+        ).data
 
 
 class AvatarUpdateSerializer(serializers.ModelSerializer):
