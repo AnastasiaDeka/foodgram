@@ -338,4 +338,4 @@ class RecipeViewSet(viewsets.ModelViewSet):
         """Перенаправление по короткой ссылке на рецепт."""
         recipe = get_object_or_404(Recipe, short_link=short_link)
 
-        return HttpResponseRedirect(f'/recipes/{recipe.pk}/')
+        return HttpResponseRedirect(f'/recipes/{recipe.short_link}/')
