@@ -319,7 +319,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         url_path='get-link'
     )
     def get_link(self, request, pk=None):
-        """Получение короткой ссылки на рецепт."""
+        """Получение ссылки на рецепт."""
         recipe = get_object_or_404(Recipe, id=pk)
 
         short_link = f'{request.get_host()}/{recipe.short_link}/'
