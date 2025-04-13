@@ -149,8 +149,8 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     """Сериализатор для создания и обновления рецепта."""
 
     image = Base64ImageField(use_url=True)
-    tags = serializers.PrimaryKeyRelatedField(
-        queryset=Tag.objects.all(), many=True
+    tags = serializers.SlugRelatedField(
+        queryset=Tag.objects.all(), slug_field='name', many=True
     )
     ingredients = IngredientAmountCreateUpdateSerializer(many=True)
     author = UserSerializer(read_only=True)
